@@ -11,8 +11,12 @@ import {
   query, orderBy, limit, onSnapshot, arrayUnion, arrayRemove, increment,
   where, getDocs, deleteDoc, getDoc, setDoc
 } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js';
+import {
+  gradientCSS, setGradientBg, escapeHTML,
+  formatTime, buildPostCard, updatePostCard,
+} from './shared.js';
 
-// ── Firebase ──
+// ── Firebase + moderator profiles (fetched from server — emails never in client JS) ──
 const firebaseConfig = await fetch('/api/config').then(r => r.json());
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -20,12 +24,11 @@ const auth = getAuth(app);
 const POSTS = 'hangul_messages';
 const USERS = 'hangul_usernames';
 
-const MODERATORS = {
-  'REDACTED_MOD_EMAIL_1': { id: 'adm_matheusdanoite', name: 'matheusdanoite', gradient: ['#ffffff', '#1a1a1a'] },
-  'REDACTED_MOD_EMAIL_2':        { id: 'adm_anithesun',      name: 'anithesun',      gradient: ['#e8153a', '#96f7a0'] },
-};
+const MODERATORS = Object.fromEntries(
+  (firebaseConfig.moderatorProfiles || []).map(p => [p.email, p])
+);
+const MOD_NAMES   = new Set(Object.values(MODERATORS).map(p => p.name));
 const ADMIN_EMAILS = Object.keys(MODERATORS);
-const MOD_NAMES = new Set(Object.values(MODERATORS).map(p => p.name));
 const GOOGLE_PROVIDER = new GoogleAuthProvider();
 
 // ═══════════════════════════════════════════
@@ -67,21 +70,6 @@ const seenAtStart = loadSeen();
 const seenThisSession = new Set();
 let notifBaseline = loadBaseline();
 
-function gradientCSS(g) {
-  return `linear-gradient(to bottom right, ${g[0]} 0%, ${g[1]} 100%)`;
-}
-
-function setGradientBg(el, colors) {
-  el.style.backgroundImage = gradientCSS(colors);
-  el.style.backgroundSize = '130% 130%';
-  el.style.backgroundPosition = 'center center';
-}
-
-function escapeHTML(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
 
 // ═══════════════════════════════════════════
 // TERMS MODAL
@@ -609,85 +597,21 @@ function markSeen(id) {
   saveSeen(new Set([...seenAtStart, ...seenThisSession]));
 }
 
-function formatTime(ts) {
-  if (!ts) return 'agora';
-  const date = ts.toDate ? ts.toDate() : new Date(ts.seconds * 1000);
-  const diff = (Date.now() - date.getTime()) / 1000;
-  if (diff < 30) return 'agora';
-  if (diff < 60) return `${Math.floor(diff)}s`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-}
 
 function buildPostElement(id, data) {
-  const post = document.createElement('article');
-  post.className = 'post';
-  post.dataset.id = id;
-  if (data.authorId === me?.id) post.classList.add('is-mine');
-
-  const grad = data.gradient?.length === 2 ? gradientCSS(data.gradient) : gradientCSS(['#ff2d78', '#9b59ff']);
-  const liked = (data.likedBy || []).includes(me?.id);
-  const likeCount = (data.likedBy || []).length;
-  const replyCount = data.replyCount || 0;
-
-  const contentHTML = data.type === 'drawing'
-    ? `<img class="post-drawing" src="${data.message}" alt="desenho" loading="lazy" />`
-    : `<div class="post-content">${escapeHTML(data.message)}</div>`;
-
-  post.innerHTML = `
-    <div class="avatar avatar-md" style="background-image:${grad};background-size:130% 130%;background-position:center center"></div>
-    <div class="post-body">
-      <div class="post-header">
-        <span class="post-author">${escapeHTML(data.author || 'anônimo')}</span>
-        ${MOD_NAMES.has(data.author) ? '<span class="mod-star">★</span>' : ''}
-        <span class="post-time">${formatTime(data.createdAt)}</span>
-        ${data.authorId === me?.id ? '<span class="post-mine-tag">você</span>' : ''}
-      </div>
-      ${contentHTML}
-      <div class="post-actions">
-        <button class="action-btn like-btn ${liked ? 'liked' : ''}" type="button">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="${liked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-          </svg>
-          <span class="count">${likeCount}</span>
-        </button>
-        <button class="action-btn reply-btn" type="button">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
-          </svg>
-          <span class="count">${replyCount}</span>
-        </button>
-      </div>
-      <div class="replies-section"></div>
-    </div>
-  `;
-
-  post.querySelector('.like-btn').addEventListener('click', () => toggleLike(id, data));
-  post.querySelector('.reply-btn').addEventListener('click', () => {
-    const input = post.querySelector('.reply-input');
-    if (input) {
-      input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      input.focus();
-    }
+  const el = buildPostCard(id, data, {
+    me,
+    modNames: MOD_NAMES,
+    onLike: toggleLike,
+    onReplyClick: (el) => initReplySection(id, el),
   });
-
-  seenObserver.observe(post);
-  replySubObserver.observe(post);
-
-  return post;
+  seenObserver.observe(el);
+  replySubObserver.observe(el);
+  return el;
 }
 
 function updatePostElement(el, id, data) {
-  const liked = (data.likedBy || []).includes(me?.id);
-  const likeCount = (data.likedBy || []).length;
-  const replyCount = data.replyCount || 0;
-  const likeBtn = el.querySelector('.like-btn');
-  likeBtn.classList.toggle('liked', liked);
-  likeBtn.querySelector('svg').setAttribute('fill', liked ? 'currentColor' : 'none');
-  likeBtn.querySelector('.count').textContent = likeCount;
-  el.querySelector('.reply-btn .count').textContent = replyCount;
-  el.querySelector('.post-time').textContent = formatTime(data.createdAt);
+  updatePostCard(el, data, me);
 }
 
 async function toggleLike(id, data) {
@@ -935,10 +859,7 @@ function renderInto(container, list) {
 setInterval(() => {
   postsMap.forEach((data, id) => {
     const el = cardElements.get(id);
-    if (el) {
-      const t = el.querySelector('.post-time');
-      if (t) t.textContent = formatTime(data.createdAt);
-    }
+    if (el) updatePostCard(el, data, me);
   });
 }, 30000);
 
