@@ -42,62 +42,47 @@
     /* ── Header ── */
     .adm-header {
       display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 20px; padding-bottom: 14px;
+      margin-bottom: 16px; padding-bottom: 14px;
       border-bottom: 1px solid var(--border-subtle);
-      gap: 10px; flex-wrap: wrap;
     }
     .adm-brand .w1 { font-size: 1.05rem; font-weight: 800; color: var(--pink-neon); }
     .adm-brand .w2 { font-size: 1.05rem; font-weight: 300; color: var(--purple-accent); }
     .adm-brand .tag { font-size: .6rem; letter-spacing: .15em; color: var(--text-muted); text-transform: uppercase; }
-    .header-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-    .btn-tools {
-      display: flex; align-items: center; gap: 6px;
+    .btn-reports {
+      position: relative;
+      width: 40px; height: 40px;
+      display: flex; align-items: center; justify-content: center;
       background: var(--surface-1); border: 1px solid var(--border-subtle);
-      color: var(--text-secondary); padding: 7px 14px; border-radius: 8px;
-      font-size: .82rem; font-weight: 600; transition: background .2s, border-color .2s, color .2s;
+      border-radius: 50%; color: var(--text-secondary);
+      transition: background .2s, border-color .2s, color .2s;
+      flex-shrink: 0;
     }
-    .btn-tools:hover { background: var(--surface-hover); }
-    .btn-tools.active {
-      background: rgba(155,89,255,.12); border-color: rgba(155,89,255,.4);
-      color: var(--purple-accent);
-    }
-    .btn-tools .chevron { transition: transform .25s; }
-    .btn-tools.active .chevron { transform: rotate(180deg); }
+    .btn-reports:hover { background: var(--surface-hover); color: var(--text-primary); }
+    .btn-reports.has-reports { border-color: rgba(255,59,59,.5); color: var(--red); }
 
-    .btn-logout {
-      background: var(--surface-1); border: 1px solid var(--border-subtle);
-      color: var(--text-secondary); padding: 7px 14px; border-radius: 8px;
-      font-size: .8rem; transition: background .2s;
-    }
-    .btn-logout:hover { background: var(--surface-hover); }
-
-    /* ── Tools panel ── */
-    .tools-panel {
-      overflow: hidden; max-height: 0; opacity: 0;
-      transition: max-height .35s ease, opacity .25s ease, margin .25s ease;
-      margin-bottom: 0;
-    }
-    .tools-panel.open { max-height: 1200px; opacity: 1; margin-bottom: 20px; }
-    .tools-inner {
-      border: 1px solid var(--border-subtle); border-radius: 14px;
-      padding: 16px; background: var(--surface-1);
-      display: flex; flex-direction: column; gap: 14px;
+    .reports-badge {
+      position: absolute; top: -3px; right: -3px;
+      background: var(--red); color: #fff;
+      font-size: .58rem; font-weight: 700;
+      padding: 1px 5px; border-radius: 20px;
+      min-width: 16px; text-align: center; line-height: 1.6;
+      pointer-events: none;
     }
 
-    /* Stats */
-    .stats-bar { display: flex; gap: 10px; flex-wrap: wrap; }
+    /* ── Stats bar ── */
+    .stats-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
     .stat-card {
-      flex: 1; min-width: 120px; background: var(--surface-2);
-      border: 1px solid var(--border-subtle); border-radius: 10px; padding: 12px 16px;
+      flex: 1; min-width: 70px; background: var(--surface-2);
+      border: 1px solid var(--border-subtle); border-radius: 10px; padding: 10px 12px;
     }
-    .stat-value { font-size: 1.6rem; font-weight: 700; color: var(--pink-neon); line-height: 1; }
-    .stat-label { font-size: .7rem; color: var(--text-muted); margin-top: 3px; }
+    .stat-value { font-size: 1.4rem; font-weight: 700; color: var(--pink-neon); line-height: 1; }
+    .stat-label { font-size: .65rem; color: var(--text-muted); margin-top: 2px; }
 
-    /* Controls */
-    .controls-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    /* ── Controls bar ── */
+    .controls-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
     .search-input {
-      flex: 1; min-width: 180px; background: var(--surface-2);
+      flex: 1; min-width: 160px; background: var(--surface-2);
       border: 1px solid var(--border-subtle); border-radius: 8px;
       color: var(--text-primary); padding: 9px 12px; font-size: .88rem;
       outline: none; transition: border-color .2s;
@@ -156,72 +141,68 @@
 
     /* ── Post list ── */
     .post-list { display: flex; flex-direction: column; gap: 10px; }
-
-    /* Admin overrides for shared .post */
     .post-list .post { border-radius: 12px; }
-
-    /* Reply button active state (admin toggle) */
-    .post-list .reply-btn.open {
-      background: rgba(155,89,255,.1); color: var(--purple-accent);
-    }
-
-    /* Inline text for "no replies" */
+    .post-list .reply-btn.open { background: rgba(155,89,255,.1); color: var(--purple-accent); }
     .replies-empty { font-size: .8rem; color: var(--text-muted); padding: 4px 0 8px; }
 
-    /* ── Reports ── */
-    .reports-section { display: flex; flex-direction: column; gap: 8px; }
-    .reports-header {
-      display: flex; align-items: center; gap: 8px;
-      font-size: .72rem; font-weight: 700; text-transform: uppercase;
-      letter-spacing: .08em; color: var(--text-muted);
+    /* ── Reports overlay ── */
+    .reports-overlay {
+      position: fixed; inset: 0; z-index: 500;
+      background: var(--bg);
+      display: flex; flex-direction: column;
+      transform: translateX(100%);
+      transition: transform .3s cubic-bezier(.4,0,.2,1);
+      overflow: hidden;
     }
-    .reports-count {
-      background: rgba(255,59,59,.15); color: var(--red);
-      font-size: .68rem; font-weight: 700;
-      padding: 1px 7px; border-radius: 20px;
-    }
-    .report-card {
-      background: var(--surface-2); border: 1px solid rgba(255,59,59,.15);
-      border-radius: 10px; padding: 10px 12px;
-      display: flex; flex-direction: column; gap: 6px;
-    }
-    .report-card.is-hidden { border-color: rgba(255,59,59,.4); background: rgba(255,59,59,.03); }
-    .report-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .report-author { font-size: .84rem; font-weight: 700; color: var(--text-primary); }
-    .report-tags { display: flex; gap: 6px; align-items: center; }
-    .report-count-badge {
-      font-size: .66rem; font-weight: 700;
-      background: rgba(255,59,59,.15); color: var(--red);
-      padding: 2px 7px; border-radius: 20px;
-    }
-    .report-status { font-size: .66rem; padding: 2px 7px; border-radius: 20px; font-weight: 600; }
-    .report-status.is-hidden { background: rgba(255,59,59,.12); color: var(--red); }
-    .report-status.is-visible { background: rgba(52,232,158,.1); color: var(--green); }
-    .report-preview {
-      font-size: .8rem; color: var(--text-secondary);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .report-actions { display: flex; gap: 6px; }
-    .btn-reinstate {
-      background: rgba(52,232,158,.1); border: 1px solid rgba(52,232,158,.25);
-      color: var(--green); padding: 4px 12px; border-radius: 6px;
-      font-size: .75rem; font-weight: 600; transition: background .15s;
-    }
-    .btn-reinstate:hover { background: rgba(52,232,158,.2); }
-    .btn-report-del {
-      background: rgba(255,59,59,.08); border: 1px solid rgba(255,59,59,.18);
-      color: var(--red); padding: 4px 12px; border-radius: 6px;
-      font-size: .75rem; font-weight: 600; transition: background .15s;
-    }
-    .btn-report-del:hover { background: rgba(255,59,59,.18); }
+    .reports-overlay.open { transform: translateX(0); }
 
-    /* Badge on Ferramentas button */
-    .reports-badge {
-      background: var(--red); color: #fff;
-      font-size: .6rem; font-weight: 700;
-      padding: 1px 5px; border-radius: 20px;
-      min-width: 16px; text-align: center; line-height: 1.5;
+    .reports-overlay-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 16px 16px 14px;
+      border-bottom: 1px solid var(--border-subtle);
+      flex-shrink: 0;
     }
+    .btn-reports-close {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--surface-2); border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      display: flex; align-items: center; justify-content: center;
+      transition: background .2s; flex-shrink: 0;
+    }
+    .btn-reports-close:hover { background: var(--surface-hover); }
+    .reports-overlay-title { font-size: 1rem; font-weight: 700; flex: 1; }
+    .reports-overlay-count {
+      font-size: .72rem; font-weight: 700;
+      background: rgba(255,59,59,.15); color: var(--red);
+      padding: 3px 9px; border-radius: 20px;
+    }
+    .reports-overlay-list {
+      flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      padding: 16px; display: flex; flex-direction: column; gap: 14px;
+      max-width: 860px; width: 100%; margin: 0 auto;
+    }
+    .reports-empty {
+      text-align: center; padding: 60px 20px;
+      color: var(--text-muted); font-size: .9rem;
+    }
+
+    /* ── Report post item ── */
+    .report-post-wrap { display: flex; flex-direction: column; gap: 6px; }
+    .report-action-bar { display: flex; gap: 8px; }
+    .btn-report-del {
+      flex: 1;
+      background: rgba(255,59,59,.07); border: 1px solid rgba(255,59,59,.22);
+      color: var(--red); padding: 10px 14px; border-radius: 10px;
+      font-size: .85rem; font-weight: 600; transition: background .15s;
+    }
+    .btn-report-del:hover { background: rgba(255,59,59,.16); }
+    .btn-report-maintain {
+      flex: 1;
+      background: rgba(52,232,158,.07); border: 1px solid rgba(52,232,158,.22);
+      color: var(--green); padding: 10px 14px; border-radius: 10px;
+      font-size: .85rem; font-weight: 600; transition: background .15s;
+    }
+    .btn-report-maintain:hover { background: rgba(52,232,158,.18); }
 
     /* ── Loading / empty ── */
     .state-loading { text-align: center; padding: 50px 20px; color: var(--text-muted); }
@@ -235,11 +216,11 @@
     }
     .confirm-card {
       background: #1e0d35; border: 1px solid var(--border-strong);
-      border-radius: 16px; padding: 28px 24px; max-width: 340px; width: 90%; text-align: center;
+      border-radius: 16px; padding: 28px 24px; max-width: 340px; width: 90%;
     }
-    .confirm-icon  { font-size: 2rem; margin-bottom: 10px; }
-    .confirm-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 7px; }
-    .confirm-desc  { font-size: .86rem; color: var(--text-secondary); margin-bottom: 18px; line-height: 1.5; }
+    .confirm-icon  { font-size: 2rem; margin-bottom: 10px; text-align: center; }
+    .confirm-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 7px; text-align: center; }
+    .confirm-desc  { font-size: .86rem; color: var(--text-secondary); margin-bottom: 18px; line-height: 1.5; text-align: center; }
     .confirm-actions { display: flex; gap: 10px; justify-content: center; }
     .btn-cancel {
       background: var(--surface-2); border: 1px solid var(--border-subtle);
@@ -251,6 +232,27 @@
       font-size: .88rem; font-weight: 700; transition: background .2s;
     }
     .btn-confirm-del:hover { background: rgba(255,59,59,.28); }
+    .btn-confirm-maintain {
+      background: rgba(52,232,158,.12); border: 1px solid rgba(52,232,158,.3);
+      color: var(--green); padding: 9px 20px; border-radius: 10px;
+      font-size: .88rem; font-weight: 700; transition: background .2s;
+    }
+    .btn-confirm-maintain:hover { background: rgba(52,232,158,.22); }
+    .btn-confirm-maintain:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ── Manter dialog extras ── */
+    .maintain-label {
+      display: block; font-size: .78rem; color: var(--text-secondary);
+      margin-bottom: 6px; text-align: left;
+    }
+    .maintain-textarea {
+      width: 100%; background: var(--surface-2);
+      border: 1px solid var(--border-subtle); border-radius: 8px;
+      color: var(--text-primary); padding: 10px 12px;
+      font-size: .88rem; line-height: 1.4; resize: none; min-height: 80px;
+      outline: none; transition: border-color .2s; margin-bottom: 16px;
+    }
+    .maintain-textarea:focus { border-color: var(--green); }
   </style>
 </head>
 
@@ -282,53 +284,38 @@
         <span class="w1">WEVERSE </span><span class="w2">HANGOVER</span>
         <div class="tag">painel administrativo</div>
       </div>
-      <div class="header-right">
-        <button id="toolsToggle" class="btn-tools" title="Ferramentas de moderação">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-          </svg>
-          Ferramentas
-          <span class="reports-badge hidden" id="reportsBadge"></span>
-          <svg class="chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
-        </button>
-        <button id="logoutBtn" class="btn-logout">sair</button>
-      </div>
+      <button id="reportsBtn" class="btn-reports" title="Denúncias">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+          <line x1="4" y1="22" x2="4" y2="15"/>
+        </svg>
+        <span class="reports-badge hidden" id="reportsBadge"></span>
+      </button>
     </header>
 
-    <!-- Collapsible tools panel -->
-    <div id="toolsPanel" class="tools-panel">
-      <div class="tools-inner">
-        <div class="stats-bar">
-          <div class="stat-card"><div class="stat-value" id="statTotal">—</div><div class="stat-label">posts no total</div></div>
-          <div class="stat-card"><div class="stat-value" id="statUsers">—</div><div class="stat-label">usuários únicos</div></div>
-          <div class="stat-card"><div class="stat-value" id="statDrawings">—</div><div class="stat-label">desenhos</div></div>
-          <div class="stat-card"><div class="stat-value" id="statLikes">—</div><div class="stat-label">curtidas totais</div></div>
-        </div>
-        <div class="controls-bar">
-          <input type="search" id="searchInput" class="search-input" placeholder="buscar por autor ou conteúdo…" />
-          <select id="filterSelect" class="filter-select">
-            <option value="all">todos os posts</option>
-            <option value="text">só textos</option>
-            <option value="drawing">só desenhos</option>
-          </select>
-          <button id="refreshBtn" class="btn-refresh">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-            </svg>
-            atualizar
-          </button>
-        </div>
-        <div class="posts-count-tools" id="postsCountTools"></div>
-        <div class="reports-section hidden" id="reportsSection">
-          <div class="reports-header">
-            denúncias
-            <span class="reports-count" id="reportsCount">0</span>
-          </div>
-          <div id="reportsList"></div>
-        </div>
-      </div>
+    <!-- Stats -->
+    <div class="stats-bar">
+      <div class="stat-card"><div class="stat-value" id="statTotal">—</div><div class="stat-label">posts</div></div>
+      <div class="stat-card"><div class="stat-value" id="statUsers">—</div><div class="stat-label">usuários</div></div>
+      <div class="stat-card"><div class="stat-value" id="statDrawings">—</div><div class="stat-label">desenhos</div></div>
+      <div class="stat-card"><div class="stat-value" id="statLikes">—</div><div class="stat-label">curtidas</div></div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls-bar">
+      <input type="search" id="searchInput" class="search-input" placeholder="buscar por autor ou conteúdo…" />
+      <select id="filterSelect" class="filter-select">
+        <option value="all">todos os posts</option>
+        <option value="text">só textos</option>
+        <option value="drawing">só desenhos</option>
+      </select>
+      <button id="refreshBtn" class="btn-refresh">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+        </svg>
+        atualizar
+      </button>
+      <span class="posts-count-tools" id="postsCountTools"></span>
     </div>
 
     <!-- Composer -->
@@ -351,6 +338,20 @@
 
   </div>
 
+  <!-- Reports overlay (full-screen, slides in from right) -->
+  <div id="reportsOverlay" class="reports-overlay">
+    <div class="reports-overlay-header">
+      <button id="reportsClose" class="btn-reports-close" type="button" title="Voltar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+      <span class="reports-overlay-title">denúncias</span>
+      <span class="reports-overlay-count hidden" id="reportsOverlayCount"></span>
+    </div>
+    <div id="reportsOverlayList" class="reports-overlay-list"></div>
+  </div>
+
   <!-- Loading -->
   <div id="loadingScreen" class="state-loading">
     <svg class="spinner" width="32" height="32" viewBox="0 0 24 24">
@@ -363,7 +364,7 @@
   <!-- Toast -->
   <div id="toast" class="toast"></div>
 
-  <!-- Confirm modal -->
+  <!-- Confirm modal (delete) -->
   <div id="confirmOverlay" class="confirm-overlay hidden">
     <div class="confirm-card">
       <div class="confirm-icon">🗑️</div>
@@ -372,6 +373,23 @@
       <div class="confirm-actions">
         <button id="confirmCancel" class="btn-cancel">cancelar</button>
         <button id="confirmOk" class="btn-confirm-del">deletar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manter modal -->
+  <div id="maintainOverlay" class="confirm-overlay hidden">
+    <div class="confirm-card">
+      <div class="confirm-title">Manter post?</div>
+      <div class="confirm-desc" id="maintainDesc"></div>
+      <div id="maintainNoteWrap" class="hidden">
+        <label class="maintain-label">Justificativa (obrigatória para 3+ denúncias)</label>
+        <textarea id="maintainNoteInput" class="maintain-textarea"
+          placeholder="Explique o motivo de manter este post…" maxlength="300"></textarea>
+      </div>
+      <div class="confirm-actions">
+        <button id="maintainCancel" class="btn-cancel">cancelar</button>
+        <button id="maintainOk" class="btn-confirm-maintain">manter</button>
       </div>
     </div>
   </div>
@@ -404,42 +422,47 @@
     const db   = getFirestore(app);
 
     // ── DOM ──
-    const loginScreen    = document.getElementById('loginScreen');
-    const adminShell     = document.getElementById('adminShell');
-    const loadingScreen  = document.getElementById('loadingScreen');
-    const loginBtn       = document.getElementById('loginBtn');
-    const logoutBtn      = document.getElementById('logoutBtn');
-    const toolsToggle    = document.getElementById('toolsToggle');
-    const toolsPanel     = document.getElementById('toolsPanel');
-    const searchInput    = document.getElementById('searchInput');
-    const filterSelect   = document.getElementById('filterSelect');
-    const refreshBtn     = document.getElementById('refreshBtn');
-    const postList       = document.getElementById('postList');
-    const postsCountTools= document.getElementById('postsCountTools');
-    const statTotal      = document.getElementById('statTotal');
-    const statUsers      = document.getElementById('statUsers');
-    const statDrawings   = document.getElementById('statDrawings');
-    const statLikes      = document.getElementById('statLikes');
-    const composeAvatar  = document.getElementById('composeAvatar');
-    const composeText    = document.getElementById('composeText');
-    const composeCount   = document.getElementById('composeCount');
-    const composeBtn     = document.getElementById('composeBtn');
-    const toastEl        = document.getElementById('toast');
-    const reportsBadge   = document.getElementById('reportsBadge');
-    const reportsSection = document.getElementById('reportsSection');
-    const reportsCount   = document.getElementById('reportsCount');
-    const reportsList    = document.getElementById('reportsList');
-    const confirmOverlay = document.getElementById('confirmOverlay');
-    const confirmTitle   = document.getElementById('confirmTitle');
-    const confirmDesc    = document.getElementById('confirmDesc');
-    const confirmCancel  = document.getElementById('confirmCancel');
-    const confirmOk      = document.getElementById('confirmOk');
+    const loginScreen        = document.getElementById('loginScreen');
+    const adminShell         = document.getElementById('adminShell');
+    const loadingScreen      = document.getElementById('loadingScreen');
+    const loginBtn           = document.getElementById('loginBtn');
+    const reportsBtn         = document.getElementById('reportsBtn');
+    const reportsOverlay     = document.getElementById('reportsOverlay');
+    const reportsClose       = document.getElementById('reportsClose');
+    const reportsOverlayCount= document.getElementById('reportsOverlayCount');
+    const reportsOverlayList = document.getElementById('reportsOverlayList');
+    const reportsBadge       = document.getElementById('reportsBadge');
+    const searchInput        = document.getElementById('searchInput');
+    const filterSelect       = document.getElementById('filterSelect');
+    const refreshBtn         = document.getElementById('refreshBtn');
+    const postList           = document.getElementById('postList');
+    const postsCountTools    = document.getElementById('postsCountTools');
+    const statTotal          = document.getElementById('statTotal');
+    const statUsers          = document.getElementById('statUsers');
+    const statDrawings       = document.getElementById('statDrawings');
+    const statLikes          = document.getElementById('statLikes');
+    const composeAvatar      = document.getElementById('composeAvatar');
+    const composeText        = document.getElementById('composeText');
+    const composeCount       = document.getElementById('composeCount');
+    const composeBtn         = document.getElementById('composeBtn');
+    const toastEl            = document.getElementById('toast');
+    const confirmOverlay     = document.getElementById('confirmOverlay');
+    const confirmTitle       = document.getElementById('confirmTitle');
+    const confirmDesc        = document.getElementById('confirmDesc');
+    const confirmCancel      = document.getElementById('confirmCancel');
+    const confirmOk          = document.getElementById('confirmOk');
+    const maintainOverlay    = document.getElementById('maintainOverlay');
+    const maintainDesc       = document.getElementById('maintainDesc');
+    const maintainNoteWrap   = document.getElementById('maintainNoteWrap');
+    const maintainNoteInput  = document.getElementById('maintainNoteInput');
+    const maintainCancel     = document.getElementById('maintainCancel');
+    const maintainOk         = document.getElementById('maintainOk');
 
-    let allPosts       = [];
-    let modProfile     = null;
-    let toolsOpen      = false;
-    let pendingConfirm = null;
-    let toastTimer     = null;
+    let allPosts        = [];
+    let modProfile      = null;
+    let pendingConfirm  = null;
+    let pendingMaintain = null;
+    let toastTimer      = null;
 
     // ── Toast ──
     function showToast(text, type = '') {
@@ -449,7 +472,7 @@
       toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2600);
     }
 
-    // ── Confirm ──
+    // ── Confirm (delete) ──
     function openConfirm(title, desc, onOk) {
       confirmTitle.textContent = title;
       confirmDesc.textContent  = desc;
@@ -465,12 +488,45 @@
       if (pendingConfirm) { pendingConfirm(); pendingConfirm = null; }
     });
 
+    // ── Manter dialog ──
+    function openMaintainDialog(post, onOk) {
+      const count = post.reportedBy?.length || 0;
+      const needsNote = count >= 3;
+      maintainDesc.textContent = `Post de @${post.author || 'anônimo'} com ${count} denúncia${count !== 1 ? 's' : ''}. O post voltará a ser visível para todos.`;
+      maintainNoteWrap.classList.toggle('hidden', !needsNote);
+      maintainNoteInput.value = '';
+      maintainOk.disabled = needsNote;
+      maintainOverlay.classList.remove('hidden');
+      pendingMaintain = { post, onOk, needsNote };
+      if (needsNote) setTimeout(() => maintainNoteInput.focus(), 100);
+    }
+
+    maintainNoteInput.addEventListener('input', () => {
+      if (pendingMaintain?.needsNote) {
+        maintainOk.disabled = maintainNoteInput.value.trim().length === 0;
+      }
+    });
+
+    maintainCancel.addEventListener('click', () => {
+      maintainOverlay.classList.add('hidden');
+      pendingMaintain = null;
+    });
+
+    maintainOk.addEventListener('click', () => {
+      if (!pendingMaintain) return;
+      if (pendingMaintain.needsNote && !maintainNoteInput.value.trim()) return;
+      const note = maintainNoteInput.value.trim();
+      const { post, onOk } = pendingMaintain;
+      maintainOverlay.classList.add('hidden');
+      pendingMaintain = null;
+      onOk(post, note);
+    });
+
     // ── Auth ──
     loginBtn.addEventListener('click', async () => {
       try { await signInWithPopup(auth, new GoogleAuthProvider()); }
       catch (e) { showToast('erro ao entrar: ' + e.message, 'error'); }
     });
-    logoutBtn.addEventListener('click', () => signOut(auth));
 
     onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -490,17 +546,14 @@
       loginScreen.classList.add('hidden');
       loadingScreen.classList.add('hidden');
       adminShell.classList.remove('hidden');
+      adminShell.classList.add('tools-active');
       composeAvatar.style.backgroundImage = gradientCSS(modProfile.gradient);
       loadPosts();
     });
 
-    // ── Tools toggle ──
-    toolsToggle.addEventListener('click', () => {
-      toolsOpen = !toolsOpen;
-      toolsToggle.classList.toggle('active', toolsOpen);
-      toolsPanel.classList.toggle('open', toolsOpen);
-      adminShell.classList.toggle('tools-active', toolsOpen);
-    });
+    // ── Reports overlay ──
+    reportsBtn.addEventListener('click', () => reportsOverlay.classList.add('open'));
+    reportsClose.addEventListener('click', () => reportsOverlay.classList.remove('open'));
 
     // ── Admin Composer ──
     composeText.addEventListener('input', () => {
@@ -571,84 +624,104 @@
 
     // ── Reports ──
     function updateReports() {
-      const reported = allPosts
-        .filter(p => (p.reportedBy?.length || 0) > 0)
-        .sort((a, b) => (b.reportedBy?.length || 0) - (a.reportedBy?.length || 0));
+      // A post needs review when it has more reports than the last maintained count
+      const pending = allPosts
+        .filter(p => (p.reportedBy?.length || 0) > (p.maintainedCount || 0))
+        .sort((a, b) => {
+          const da = (a.reportedBy?.length || 0) - (a.maintainedCount || 0);
+          const db2= (b.reportedBy?.length || 0) - (b.maintainedCount || 0);
+          return db2 - da;
+        });
 
-      if (reported.length > 0) {
-        reportsBadge.textContent = reported.length;
+      if (pending.length > 0) {
+        reportsBadge.textContent = pending.length;
         reportsBadge.classList.remove('hidden');
+        reportsBtn.classList.add('has-reports');
       } else {
         reportsBadge.classList.add('hidden');
+        reportsBtn.classList.remove('has-reports');
       }
 
-      if (reported.length === 0) {
-        reportsSection.classList.add('hidden');
+      reportsOverlayCount.textContent = `${pending.length} post${pending.length !== 1 ? 's' : ''}`;
+      reportsOverlayCount.classList.toggle('hidden', pending.length === 0);
+
+      reportsOverlayList.innerHTML = '';
+      if (pending.length === 0) {
+        reportsOverlayList.innerHTML = `<div class="reports-empty">sem denúncias pendentes ✓</div>`;
         return;
       }
 
-      reportsSection.classList.remove('hidden');
-      reportsCount.textContent = reported.length;
-      reportsList.innerHTML = '';
-
-      reported.forEach(post => {
-        const count    = post.reportedBy?.length || 0;
-        const isHidden = count >= 3;
-        const card = document.createElement('div');
-        card.className = 'report-card' + (isHidden ? ' is-hidden' : '');
-        card.innerHTML = `
-          <div class="report-meta">
-            <span class="report-author">${escapeHTML(post.author || 'anônimo')}</span>
-            <span class="report-tags">
-              <span class="report-count-badge">${count} ${count === 1 ? 'denúncia' : 'denúncias'}</span>
-              <span class="report-status ${isHidden ? 'is-hidden' : 'is-visible'}">${isHidden ? 'oculto' : 'visível'}</span>
-            </span>
-          </div>
-          ${post.type === 'drawing'
-            ? `<img class="post-drawing" src="${post.message}" alt="desenho" loading="lazy" />`
-            : `<div class="report-preview">${escapeHTML((post.message || '').slice(0, 90))}</div>`
-          }
-          <div class="report-actions">
-            ${isHidden ? `<button class="btn-reinstate">reexibir</button>` : ''}
-            <button class="btn-report-del">deletar</button>
-          </div>
-        `;
-
-        if (isHidden) {
-          card.querySelector('.btn-reinstate').addEventListener('click', () => reinstatePost(post.docId, card));
-        }
-        card.querySelector('.btn-report-del').addEventListener('click', () => {
-          openConfirm(
-            'Deletar post denunciado?',
-            `@${post.author || 'anônimo'} — ${count} denúncia(s). Ação permanente.`,
-            async () => {
-              try {
-                await deleteDoc(doc(db, POSTS, post.docId));
-                allPosts = allPosts.filter(p => p.docId !== post.docId);
-                updateReports();
-                updateStats();
-                renderPosts();
-                showToast('post deletado', 'success');
-              } catch (e) {
-                showToast('erro: ' + e.message, 'error');
-              }
-            }
-          );
-        });
-
-        reportsList.appendChild(card);
-      });
+      pending.forEach(post => reportsOverlayList.appendChild(buildReportItem(post)));
     }
 
-    async function reinstatePost(postId, card) {
+    function buildReportItem(post) {
+      const wrap = document.createElement('div');
+      wrap.className = 'report-post-wrap';
+
+      // Post card (read-only — no like/reply/delete handlers)
+      const card = buildPostCard(post.docId, post, {
+        me: modProfile,
+        modNames: MOD_NAMES,
+        formatTimeFn: formatTimeAbs,
+      });
+      wrap.appendChild(card);
+
+      // Action bar
+      const actionBar = document.createElement('div');
+      actionBar.className = 'report-action-bar';
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn-report-del';
+      delBtn.type = 'button';
+      delBtn.textContent = 'Deletar';
+      delBtn.addEventListener('click', () => {
+        const count = post.reportedBy?.length || 0;
+        openConfirm(
+          'Deletar post denunciado?',
+          `De @${post.author || 'anônimo'} — ${count} denúncia${count !== 1 ? 's' : ''}. Ação permanente.`,
+          async () => {
+            try {
+              await deleteDoc(doc(db, POSTS, post.docId));
+              allPosts = allPosts.filter(p => p.docId !== post.docId);
+              updateReports();
+              updateStats();
+              renderPosts();
+              showToast('post deletado', 'success');
+            } catch (e) {
+              showToast('erro: ' + e.message, 'error');
+            }
+          }
+        );
+      });
+
+      const maintainBtn = document.createElement('button');
+      maintainBtn.className = 'btn-report-maintain';
+      maintainBtn.type = 'button';
+      maintainBtn.textContent = 'Manter';
+      maintainBtn.addEventListener('click', () => {
+        openMaintainDialog(post, (post, note) => doMaintainPost(post, note));
+      });
+
+      actionBar.appendChild(delBtn);
+      actionBar.appendChild(maintainBtn);
+      wrap.appendChild(actionBar);
+
+      return wrap;
+    }
+
+    async function doMaintainPost(post, note) {
       try {
-        await updateDoc(doc(db, POSTS, postId), { reportedBy: [] });
+        const updateData = { maintainedCount: post.reportedBy?.length || 0 };
+        if (note) updateData.maintainNote = note;
+        await updateDoc(doc(db, POSTS, post.docId), updateData);
         allPosts = allPosts.map(p =>
-          p.docId === postId ? { ...p, reportedBy: [] } : p
+          p.docId === post.docId
+            ? { ...p, maintainedCount: updateData.maintainedCount, ...(note ? { maintainNote: note } : {}) }
+            : p
         );
         updateReports();
         renderPosts();
-        showToast('post reexibido', 'success');
+        showToast('post mantido', 'success');
       } catch (e) {
         showToast('erro: ' + e.message, 'error');
       }
@@ -677,16 +750,14 @@
       filtered.forEach(p => postList.appendChild(buildAdminPostCard(p)));
     }
 
-    // ── Build post card (wraps shared buildPostCard) ──
     function buildAdminPostCard(post) {
-      const el = buildPostCard(post.docId, post, {
+      return buildPostCard(post.docId, post, {
         me: modProfile,
         modNames: MOD_NAMES,
         formatTimeFn: formatTimeAbs,
         onDelete: (id, el) => confirmDelete(post, el),
         onReplyClick: (el) => toggleRepliesSection(post, el),
       });
-      return el;
     }
 
     // ── Replies section (on-demand toggle) ──
@@ -694,7 +765,6 @@
       const section  = articleEl.querySelector('.replies-section');
       const replyBtn = articleEl.querySelector('.reply-btn');
 
-      // Toggle off if already open
       if (section.children.length > 0) {
         section.innerHTML = '';
         replyBtn.classList.remove('open');
@@ -702,14 +772,12 @@
       }
 
       replyBtn.classList.add('open');
-
       const thread = document.createElement('div');
       thread.className = 'reply-thread';
 
       try {
         const q    = query(collection(db, POSTS, post.docId, 'replies'), orderBy('createdAt', 'asc'));
         const snap = await getDocs(q);
-
         if (snap.empty) {
           const empty = document.createElement('p');
           empty.className = 'replies-empty';
@@ -807,20 +875,16 @@
             gradient: modProfile.gradient, createdAt: serverTimestamp(),
           });
           await updateDoc(doc(db, POSTS, postId), { replyCount: increment(1) });
-
           threadEl.querySelector('.replies-empty')?.remove();
-
           const fakeTs = { toDate: () => new Date() };
           threadEl.appendChild(buildReplyItem('_local_' + Date.now(), {
             type: 'text', message: txt,
             author: modProfile.name, gradient: modProfile.gradient,
             createdAt: fakeTs,
           }, postId));
-
           const localPost = allPosts.find(p => p.docId === postId);
           if (localPost) localPost.replyCount = (localPost.replyCount || 0) + 1;
           post.replyCount = (post.replyCount || 0) + 1;
-
           input.value = '';
           showToast('resposta enviada!', 'success');
         } catch (e) {
@@ -845,6 +909,7 @@
         () => doDeletePost(post, el)
       );
     }
+
     async function doDeletePost(post, el) {
       el.classList.add('deleting');
       try {

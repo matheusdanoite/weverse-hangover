@@ -328,6 +328,17 @@ input, textarea { font-family: var(--font-main); }
 .reply-send:disabled               { opacity: 0.35; cursor: not-allowed; }
 .reply-send:not(:disabled):hover   { transform: scale(1.08); }
 
+/* ════════════ MAINTAIN NOTE ════════════ */
+.maintain-sep { height: 1px; background: var(--border-subtle); margin: 8px 0 6px; }
+.maintain-note-text {
+  font-size: 0.76rem; color: var(--text-muted); font-style: italic; line-height: 1.45;
+}
+.maintain-note-label {
+  font-style: normal; font-weight: 600; font-size: 0.68rem;
+  letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--text-muted); margin-right: 4px;
+}
+
 /* ════════════ SPINNER ════════════ */
 .spinner { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

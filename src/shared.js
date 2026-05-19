@@ -129,6 +129,11 @@ export function buildPostCard(id, data, opts = {}) {
         <span class="post-doc-id">${id}</span>
       </div>
       ${contentHTML}
+      ${data.maintainNote ? `
+      <div class="maintain-note">
+        <div class="maintain-sep"></div>
+        <div class="maintain-note-text"><span class="maintain-note-label">nota do moderador</span>${escapeHTML(data.maintainNote)}</div>
+      </div>` : ''}
       <div class="post-actions">
         <button class="action-btn like-btn ${liked ? 'liked' : ''}" type="button">
           <svg width="17" height="17" viewBox="0 0 24 24"
