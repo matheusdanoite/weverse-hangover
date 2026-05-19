@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /hangul_messages/{postId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if true;
+    }
+    match /hangul_messages/{postId}/replies/{replyId} {
+      allow read, write: if true;
+    }
+
+    match /hangul_usernames/{username} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

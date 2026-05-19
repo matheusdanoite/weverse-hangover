@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#1a0a2e" />
+  <title>Weverse Hangover</title>
+  <meta name="description" content="Xingue o bias alheio, mas mantenha o respeito." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=Noto+Sans+KR:wght@400;700&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+
+<body>
+  <div class="bg-particles" id="bgParticles"></div>
+
+  <!-- ═══ TERMS MODAL ═══ -->
+  <div class="modal-overlay hidden" id="termsOverlay">
+    <div class="modal-card terms-card">
+      <div class="modal-header">
+        <h2>Termos de Uso</h2>
+        <button class="icon-btn modal-close" id="termsClose" type="button">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="terms-body">
+        <p><strong>Weverse Hangover</strong></p>
+        <p>Ao criar seu perfil e utilizar este app, você concorda com os termos abaixo.</p>
+
+        <h3>1. Dados coletados</h3>
+        <p>Ao criar seu perfil, coletamos: o nome escolhido por você, suas postagens (textos e desenhos), interações (curtidas e comentários) e um identificador de sessão gerado aleatoriamente no seu dispositivo.</p>
+
+        <h3>2. Como sua sessão funciona</h3>
+        <p>Não há criação de conta com e-mail ou senha. Ao entrar, um identificador único é gerado e armazenado localmente no seu dispositivo (localStorage). Esse identificador vincula suas postagens ao seu perfil enquanto você usar o mesmo navegador/dispositivo.</p>
+
+        <h3>3. Armazenamento</h3>
+        <p>Seus dados ficam armazenados nos servidores do Firebase (Google Cloud) e são mantidos pelos organizadores da festa <strong>Hangul Hangover</strong> para fins de arquivamento e memória do evento.</p>
+
+        <h3>4. Exclusão dos seus dados</h3>
+        <p>Você pode solicitar a exclusão de todos os seus dados de duas formas:</p>
+        <ul>
+          <li>Diretamente neste app, acessando seu perfil (ícone no canto superior direito) e clicando em "deletar meus dados".</li>
+          <li>Via DM no Instagram <strong>@hangul.hangover</strong>, informando o nome de usuário criado durante a festa.</li>
+        </ul>
+
+        <h3>5. Uso dos dados</h3>
+        <p>Suas postagens podem ser utilizadas pelos organizadores em materiais de memória e divulgação da festa.</p>
+
+        <h3>6. Contato</h3>
+        <p>Dúvidas ou solicitações: Instagram <strong>@hangul.hangover</strong>.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PROFILE MODAL ═══ -->
+  <div class="modal-overlay hidden" id="profileOverlay">
+    <div class="modal-card profile-card">
+      <div class="modal-header">
+        <h2>seu perfil</h2>
+        <button class="icon-btn modal-close" id="profileModalClose" type="button">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="profile-hero">
+        <div class="avatar avatar-lg" id="profileAvatar"></div>
+        <div class="profile-info">
+          <div class="profile-name" id="profileNameDisplay"></div>
+        </div>
+      </div>
+      <div class="profile-actions">
+        <button id="downloadPdfBtn" class="profile-action-btn" type="button">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Baixar meus posts
+        </button>
+        <button id="deleteDataBtn" class="profile-action-btn danger" type="button">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+          </svg>
+          Deletar meus dados
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ONBOARDING MODAL ═══ -->
+  <div class="onboarding-overlay hidden" id="onboardingOverlay">
+    <div class="onboarding-card">
+      <div class="onboarding-header">
+        <div class="logo-hangul">WEVERSE</div>
+        <div class="logo-hangover">HANGOVER</div>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="onboardName">escolha seu nome de usuário</label>
+        <input type="text" id="onboardName" class="input-field" placeholder="" maxlength="24"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+        <span class="name-error hidden" id="nameError">nome já em uso, escolha outro</span>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">escolha as cores do seu avatar</label>
+        <div class="avatar-builder">
+          <div class="avatar-preview" id="avatarPreview"></div>
+          <div class="color-blend-row">
+            <label class="color-swatch-label">
+              <div class="swatch-circle" id="swatch1"></div>
+              <input type="color" id="color1" value="#ff2d78" />
+            </label>
+            <span class="blend-plus">+</span>
+            <label class="color-swatch-label">
+              <div class="swatch-circle" id="swatch2"></div>
+              <input type="color" id="color2" value="#9b59ff" />
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <label class="terms-check-label">
+        <input type="checkbox" id="termsCheck" />
+        <span>Li e aceito os <button type="button" id="openTermsBtn" class="terms-link">Termos de Uso</button></span>
+      </label>
+
+      <button id="onboardSubmit" class="submit-btn" disabled>entrar ✦</button>
+    </div>
+  </div>
+
+  <!-- ═══ TOP BAR ═══ -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-hangul">WEVERSE</span>
+        <span class="brand-hangover">HANGOVER</span>
+      </div>
+      <div class="topbar-actions">
+        <button class="icon-btn" id="notifBtn" title="Notificações">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+          </svg>
+          <span class="notif-badge hidden" id="notifBadge">0</span>
+        </button>
+        <button class="icon-btn" id="profileBtn" title="Seu perfil">
+          <span class="mini-avatar" id="miniAvatar"></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-shell">
+
+    <!-- ═══ FLOATING UPDATE BUTTON ═══ -->
+    <button class="update-feed-btn hidden" id="updateFeedBtn" type="button">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+        stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10" />
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+      </svg>
+      <span class="update-count" id="updateCount">0</span> novas postagens
+    </button>
+
+    <!-- ═══ COMPOSER ═══ -->
+    <section class="composer" id="composer">
+      <div class="composer-row">
+        <div class="avatar avatar-md" id="composerAvatar"></div>
+        <div class="composer-body">
+          <textarea id="messageField" class="composer-input" placeholder="o que tá rolando na festa?"
+            maxlength="300" rows="2"></textarea>
+
+          <div id="drawSection" class="draw-section hidden">
+            <div class="canvas-container">
+              <canvas id="drawCanvas" width="600" height="800"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="composer-footer">
+        <div class="composer-tools">
+          <button id="toggleDraw" class="mode-toggle" type="button" title="Alternar texto / desenho">
+            <!-- icon injected by JS -->
+            <span id="toggleIconWrap"></span>
+          </button>
+
+          <span class="char-count" id="charCountWrapper"><span id="charCount">0</span>/300</span>
+
+          <div class="draw-inline-tools hidden" id="drawControls">
+            <div class="color-picker-wrapper">
+              <div id="colorPreview" class="color-preview"></div>
+              <input type="color" id="brushColor" value="#ff2d78" class="color-input" />
+            </div>
+            <button id="clearCanvas" class="clear-btn" type="button" title="Limpar desenho">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <button id="submitBtn" class="post-btn" type="button">
+          <span class="btn-text">postar</span>
+          <span class="btn-loading hidden">
+            <svg class="spinner" width="18" height="18" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none"
+                stroke-dasharray="60" stroke-linecap="round" />
+            </svg>
+          </span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ═══ FEED ═══ -->
+    <section class="feed" id="feed"></section>
+
+    <!-- ═══ SEEN POSTS ACCORDION ═══ -->
+    <section class="seen-section" id="seenSection">
+      <button class="seen-toggle" id="seenToggle" type="button">
+        <span class="seen-toggle-text">posts visualizados</span>
+        <span class="seen-count" id="seenCount">0</span>
+        <svg class="seen-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      <div class="seen-feed hidden" id="seenFeed"></div>
+    </section>
+
+    <div class="empty-feed hidden" id="emptyFeed">
+      <span class="empty-icon">✦</span>
+      <p>ainda não há posts. seja o primeiro.</p>
+    </div>
+  </main>
+
+  <!-- ═══ NOTIFICATIONS DRAWER ═══ -->
+  <aside class="notif-drawer hidden" id="notifDrawer">
+    <div class="notif-header">
+      <h2>notificações</h2>
+      <button class="icon-btn" id="notifClose" type="button">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+    </div>
+    <div class="notif-list" id="notifList"></div>
+  </aside>
+  <div class="drawer-backdrop hidden" id="drawerBackdrop"></div>
+
+  <!-- ═══ TOAST ═══ -->
+  <div id="successToast" class="toast hidden">
+    <span class="toast-icon">✦</span>
+    <span class="toast-text">postado!</span>
+  </div>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+
+</html>
