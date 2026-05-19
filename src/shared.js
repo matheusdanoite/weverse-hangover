@@ -126,7 +126,6 @@ export function buildPostCard(id, data, opts = {}) {
         ${isMod  ? '<span class="mod-star">★</span>' : ''}
         <span class="post-time">${formatTimeFn(data.createdAt)}</span>
         ${isMine ? '<span class="post-mine-tag">você</span>' : ''}
-        ${isDrawing ? '<span class="badge-drawing">desenho</span>' : ''}
         <span class="post-doc-id">${id}</span>
       </div>
       ${contentHTML}

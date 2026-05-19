@@ -637,7 +637,7 @@ async function reportPost(id, data) {
     fetch('/api/notify_mods', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ postId: id, text: \`"\${(current.message || '').slice(0, 30)}..." foi denunciado.\` })
+      body: JSON.stringify({ postId: id, text: `"${(current.message || '').slice(0, 30)}..." foi denunciado.` })
     }).catch(console.error);
   } catch (err) {
     showToast('erro ao reportar');
