@@ -403,9 +403,10 @@
       getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
     } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js';
     import {
-      getFirestore, collection, addDoc, doc, updateDoc, deleteDoc,
+      getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, setDoc,
       serverTimestamp, query, orderBy, getDocs, limit, increment
     } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js';
+    import { getMessaging, getToken } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-messaging.js';
     import {
       gradientCSS, escapeHTML, formatTimeAbs,
       buildPostCard, updatePostCard,
@@ -550,6 +551,28 @@
       adminShell.classList.add('tools-active');
       composeAvatar.style.backgroundImage = gradientCSS(modProfile.gradient);
       loadPosts();
+      
+      // Initialize Web Push for Moderators
+      try {
+        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          const messaging = getMessaging(app);
+          const currentToken = await getToken(messaging, { 
+            vapidKey: 'BDWpogUdy0kNGEdHXCBE1Qvi_w49ABjRT20UT0CeZelZaeiqAwoSGi_ck1un1esau9jzy86mF_1Ver-L8rTpmQM',
+            serviceWorkerRegistration: registration
+          });
+          if (currentToken) {
+            await setDoc(doc(db, 'hangul_fcm_tokens', modProfile.id), {
+              token: currentToken,
+              role: 'mod',
+              updatedAt: serverTimestamp()
+            });
+          }
+        }
+      } catch (err) {
+        console.log('FCM setup failed or blocked:', err);
+      }
     });
 
     // ── Reports overlay ──
