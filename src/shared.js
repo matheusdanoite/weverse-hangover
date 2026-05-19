@@ -2,6 +2,11 @@
 // WEVERSE HANGOVER — shared utilities
 // ═══════════════════════════════════════════
 
+// Close any open post menu when clicking outside
+document.addEventListener('click', () => {
+  document.querySelectorAll('.post-menu.open').forEach(m => m.classList.remove('open'));
+});
+
 export function gradientCSS(g) {
   if (!g || g.length !== 2) return 'linear-gradient(to bottom right, #ff2d78 0%, #9b59ff 100%)';
   return `linear-gradient(to bottom right, ${g[0]} 0%, ${g[1]} 100%)`;
@@ -62,6 +67,8 @@ export function buildPostCard(id, data, opts = {}) {
     onLike = null,
     onReplyClick = null,
     onDelete = null,
+    onSelfDelete = null,
+    onReport = null,
     formatTimeFn = formatTime,
   } = opts;
 
@@ -125,6 +132,20 @@ export function buildPostCard(id, data, opts = {}) {
       </div>
       <div class="replies-section"></div>
     </div>
+    ${(isMine && onSelfDelete) || (!isMine && onReport) ? `
+    <div class="post-menu">
+      <button class="post-menu-btn" type="button" aria-label="mais opções">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="12" cy="5" r="1.8"/>
+          <circle cx="12" cy="12" r="1.8"/>
+          <circle cx="12" cy="19" r="1.8"/>
+        </svg>
+      </button>
+      <div class="post-menu-dropdown">
+        ${isMine && onSelfDelete ? `<button class="menu-item menu-danger post-selfdelete-btn" type="button">Apagar meu post</button>` : ''}
+        ${!isMine && onReport ? `<button class="menu-item post-report-btn" type="button">Reportar post</button>` : ''}
+      </div>
+    </div>` : ''}
   `;
 
   if (onLike) {
@@ -143,6 +164,33 @@ export function buildPostCard(id, data, opts = {}) {
 
   if (onDelete) {
     el.querySelector('.delete-btn').addEventListener('click', () => onDelete(id, el));
+  }
+
+  const menuBtn = el.querySelector('.post-menu-btn');
+  const menuEl  = el.querySelector('.post-menu');
+  if (menuBtn && menuEl) {
+    menuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = menuEl.classList.contains('open');
+      document.querySelectorAll('.post-menu.open').forEach(m => m.classList.remove('open'));
+      if (!isOpen) menuEl.classList.add('open');
+    });
+
+    if (onSelfDelete) {
+      const btn = el.querySelector('.post-selfdelete-btn');
+      if (btn) btn.addEventListener('click', () => {
+        menuEl.classList.remove('open');
+        onSelfDelete(id, el);
+      });
+    }
+
+    if (onReport) {
+      const btn = el.querySelector('.post-report-btn');
+      if (btn) btn.addEventListener('click', () => {
+        menuEl.classList.remove('open');
+        onReport(id, data);
+      });
+    }
   }
 
   return el;

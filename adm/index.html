@@ -50,7 +50,6 @@
     .adm-brand .w2 { font-size: 1.05rem; font-weight: 300; color: var(--purple-accent); }
     .adm-brand .tag { font-size: .6rem; letter-spacing: .15em; color: var(--text-muted); text-transform: uppercase; }
     .header-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .adm-email { font-size: .75rem; color: var(--text-muted); }
 
     .btn-tools {
       display: flex; align-items: center; gap: 6px;
@@ -79,7 +78,7 @@
       transition: max-height .35s ease, opacity .25s ease, margin .25s ease;
       margin-bottom: 0;
     }
-    .tools-panel.open { max-height: 600px; opacity: 1; margin-bottom: 20px; }
+    .tools-panel.open { max-height: 1200px; opacity: 1; margin-bottom: 20px; }
     .tools-inner {
       border: 1px solid var(--border-subtle); border-radius: 14px;
       padding: 16px; background: var(--surface-1);
@@ -169,6 +168,61 @@
     /* Inline text for "no replies" */
     .replies-empty { font-size: .8rem; color: var(--text-muted); padding: 4px 0 8px; }
 
+    /* ── Reports ── */
+    .reports-section { display: flex; flex-direction: column; gap: 8px; }
+    .reports-header {
+      display: flex; align-items: center; gap: 8px;
+      font-size: .72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: var(--text-muted);
+    }
+    .reports-count {
+      background: rgba(255,59,59,.15); color: var(--red);
+      font-size: .68rem; font-weight: 700;
+      padding: 1px 7px; border-radius: 20px;
+    }
+    .report-card {
+      background: var(--surface-2); border: 1px solid rgba(255,59,59,.15);
+      border-radius: 10px; padding: 10px 12px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .report-card.is-hidden { border-color: rgba(255,59,59,.4); background: rgba(255,59,59,.03); }
+    .report-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .report-author { font-size: .84rem; font-weight: 700; color: var(--text-primary); }
+    .report-tags { display: flex; gap: 6px; align-items: center; }
+    .report-count-badge {
+      font-size: .66rem; font-weight: 700;
+      background: rgba(255,59,59,.15); color: var(--red);
+      padding: 2px 7px; border-radius: 20px;
+    }
+    .report-status { font-size: .66rem; padding: 2px 7px; border-radius: 20px; font-weight: 600; }
+    .report-status.is-hidden { background: rgba(255,59,59,.12); color: var(--red); }
+    .report-status.is-visible { background: rgba(52,232,158,.1); color: var(--green); }
+    .report-preview {
+      font-size: .8rem; color: var(--text-secondary);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .report-actions { display: flex; gap: 6px; }
+    .btn-reinstate {
+      background: rgba(52,232,158,.1); border: 1px solid rgba(52,232,158,.25);
+      color: var(--green); padding: 4px 12px; border-radius: 6px;
+      font-size: .75rem; font-weight: 600; transition: background .15s;
+    }
+    .btn-reinstate:hover { background: rgba(52,232,158,.2); }
+    .btn-report-del {
+      background: rgba(255,59,59,.08); border: 1px solid rgba(255,59,59,.18);
+      color: var(--red); padding: 4px 12px; border-radius: 6px;
+      font-size: .75rem; font-weight: 600; transition: background .15s;
+    }
+    .btn-report-del:hover { background: rgba(255,59,59,.18); }
+
+    /* Badge on Ferramentas button */
+    .reports-badge {
+      background: var(--red); color: #fff;
+      font-size: .6rem; font-weight: 700;
+      padding: 1px 5px; border-radius: 20px;
+      min-width: 16px; text-align: center; line-height: 1.5;
+    }
+
     /* ── Loading / empty ── */
     .state-loading { text-align: center; padding: 50px 20px; color: var(--text-muted); }
     .state-empty   { text-align: center; padding: 50px 20px; color: var(--text-muted); }
@@ -234,11 +288,11 @@
             <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
           </svg>
           Ferramentas
+          <span class="reports-badge hidden" id="reportsBadge"></span>
           <svg class="chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="6 9 12 15 18 9"/>
           </svg>
         </button>
-        <span class="adm-email" id="adminEmail"></span>
         <button id="logoutBtn" class="btn-logout">sair</button>
       </div>
     </header>
@@ -267,6 +321,13 @@
           </button>
         </div>
         <div class="posts-count-tools" id="postsCountTools"></div>
+        <div class="reports-section hidden" id="reportsSection">
+          <div class="reports-header">
+            denúncias
+            <span class="reports-count" id="reportsCount">0</span>
+          </div>
+          <div id="reportsList"></div>
+        </div>
       </div>
     </div>
 
@@ -348,7 +409,6 @@
     const loadingScreen  = document.getElementById('loadingScreen');
     const loginBtn       = document.getElementById('loginBtn');
     const logoutBtn      = document.getElementById('logoutBtn');
-    const adminEmailEl   = document.getElementById('adminEmail');
     const toolsToggle    = document.getElementById('toolsToggle');
     const toolsPanel     = document.getElementById('toolsPanel');
     const searchInput    = document.getElementById('searchInput');
@@ -365,6 +425,10 @@
     const composeCount   = document.getElementById('composeCount');
     const composeBtn     = document.getElementById('composeBtn');
     const toastEl        = document.getElementById('toast');
+    const reportsBadge   = document.getElementById('reportsBadge');
+    const reportsSection = document.getElementById('reportsSection');
+    const reportsCount   = document.getElementById('reportsCount');
+    const reportsList    = document.getElementById('reportsList');
     const confirmOverlay = document.getElementById('confirmOverlay');
     const confirmTitle   = document.getElementById('confirmTitle');
     const confirmDesc    = document.getElementById('confirmDesc');
@@ -426,7 +490,6 @@
       loginScreen.classList.add('hidden');
       loadingScreen.classList.add('hidden');
       adminShell.classList.remove('hidden');
-      adminEmailEl.textContent = user.email;
       composeAvatar.style.backgroundImage = gradientCSS(modProfile.gradient);
       loadPosts();
     });
@@ -487,6 +550,7 @@
         const snap = await getDocs(q);
         allPosts   = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
         updateStats();
+        updateReports();
         renderPosts();
       } catch (e) {
         postList.innerHTML = `<div class="state-empty"><p>erro: ${e.message}</p></div>`;
@@ -503,6 +567,90 @@
       statUsers.textContent    = users;
       statDrawings.textContent = drawings;
       statLikes.textContent    = likes;
+    }
+
+    // ── Reports ──
+    function updateReports() {
+      const reported = allPosts
+        .filter(p => (p.reportedBy?.length || 0) > 0)
+        .sort((a, b) => (b.reportedBy?.length || 0) - (a.reportedBy?.length || 0));
+
+      if (reported.length > 0) {
+        reportsBadge.textContent = reported.length;
+        reportsBadge.classList.remove('hidden');
+      } else {
+        reportsBadge.classList.add('hidden');
+      }
+
+      if (reported.length === 0) {
+        reportsSection.classList.add('hidden');
+        return;
+      }
+
+      reportsSection.classList.remove('hidden');
+      reportsCount.textContent = reported.length;
+      reportsList.innerHTML = '';
+
+      reported.forEach(post => {
+        const count    = post.reportedBy?.length || 0;
+        const isHidden = count >= 3;
+        const preview  = post.type === 'drawing' ? '[desenho]' : (post.message || '').slice(0, 90);
+
+        const card = document.createElement('div');
+        card.className = 'report-card' + (isHidden ? ' is-hidden' : '');
+        card.innerHTML = `
+          <div class="report-meta">
+            <span class="report-author">${escapeHTML(post.author || 'anônimo')}</span>
+            <span class="report-tags">
+              <span class="report-count-badge">${count} ${count === 1 ? 'denúncia' : 'denúncias'}</span>
+              <span class="report-status ${isHidden ? 'is-hidden' : 'is-visible'}">${isHidden ? 'oculto' : 'visível'}</span>
+            </span>
+          </div>
+          <div class="report-preview">${escapeHTML(preview)}</div>
+          <div class="report-actions">
+            ${isHidden ? `<button class="btn-reinstate">reexibir</button>` : ''}
+            <button class="btn-report-del">deletar</button>
+          </div>
+        `;
+
+        if (isHidden) {
+          card.querySelector('.btn-reinstate').addEventListener('click', () => reinstatePost(post.docId, card));
+        }
+        card.querySelector('.btn-report-del').addEventListener('click', () => {
+          openConfirm(
+            'Deletar post denunciado?',
+            `@${post.author || 'anônimo'} — ${count} denúncia(s). Ação permanente.`,
+            async () => {
+              try {
+                await deleteDoc(doc(db, POSTS, post.docId));
+                allPosts = allPosts.filter(p => p.docId !== post.docId);
+                updateReports();
+                updateStats();
+                renderPosts();
+                showToast('post deletado', 'success');
+              } catch (e) {
+                showToast('erro: ' + e.message, 'error');
+              }
+            }
+          );
+        });
+
+        reportsList.appendChild(card);
+      });
+    }
+
+    async function reinstatePost(postId, card) {
+      try {
+        await updateDoc(doc(db, POSTS, postId), { reportedBy: [] });
+        allPosts = allPosts.map(p =>
+          p.docId === postId ? { ...p, reportedBy: [] } : p
+        );
+        updateReports();
+        renderPosts();
+        showToast('post reexibido', 'success');
+      } catch (e) {
+        showToast('erro: ' + e.message, 'error');
+      }
     }
 
     // ── Render feed ──

@@ -604,10 +604,38 @@ function buildPostElement(id, data) {
     modNames: MOD_NAMES,
     onLike: toggleLike,
     onReplyClick: (el) => initReplySection(id, el),
+    onSelfDelete: (id, el) => selfDeletePost(id, el),
+    onReport: (id, data) => reportPost(id, data),
   });
   seenObserver.observe(el);
   replySubObserver.observe(el);
   return el;
+}
+
+async function selfDeletePost(id, el) {
+  if (!confirm('Apagar seu post permanentemente?')) return;
+  el.classList.add('deleting');
+  try {
+    await deleteDoc(doc(db, POSTS, id));
+  } catch (err) {
+    el.classList.remove('deleting');
+    showToast('erro ao apagar post');
+  }
+}
+
+async function reportPost(id, data) {
+  if (!me) return openOnboarding();
+  const current = postsMap.get(id) ?? pendingNewPosts.get(id) ?? data;
+  if ((current.reportedBy || []).includes(me.id)) {
+    showToast('você já reportou este post');
+    return;
+  }
+  try {
+    await updateDoc(doc(db, POSTS, id), { reportedBy: arrayUnion(me.id) });
+    showToast('post reportado');
+  } catch (err) {
+    showToast('erro ao reportar');
+  }
 }
 
 function updatePostElement(el, id, data) {
@@ -812,6 +840,7 @@ function renderFeed() {
   const newPosts = [];
   const seenPosts = [];
   for (const [id, data] of postsMap.entries()) {
+    if ((data.reportedBy?.length || 0) >= 3) continue;
     if (seenAtStart.has(id)) seenPosts.push([id, data]);
     else newPosts.push([id, data]);
   }
