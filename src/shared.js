@@ -106,6 +106,7 @@ export function buildPostCard(id, data, opts = {}) {
   const replyCount = data.replyCount || 0;
   const isMod  = modNames.has(data.author);
   const isMine = data.authorId === me?.id;
+  const reported = (data.reportedBy || []).includes(me?.id);
   const grad   = gradientCSS(data.gradient?.length === 2 ? data.gradient : null);
 
   const contentHTML = isDrawing
@@ -176,7 +177,7 @@ export function buildPostCard(id, data, opts = {}) {
       </button>
       <div class="post-menu-dropdown">
         ${isMine && onSelfDelete ? `<button class="menu-item menu-danger post-selfdelete-btn" type="button">Apagar meu post</button>` : ''}
-        ${!isMine && onReport ? `<button class="menu-item post-report-btn" type="button">Reportar post</button>` : ''}
+        ${!isMine && onReport ? `<button class="menu-item post-report-btn${reported ? ' reported' : ''}" type="button" ${reported ? 'disabled' : ''}>${reported ? 'Reportado' : 'Reportar post'}</button>` : ''}
       </div>
     </div>` : ''}
   `;
@@ -237,6 +238,7 @@ export function updatePostCard(el, data, me, formatTimeFn = formatTime) {
   const liked     = (data.likedBy || []).includes(me?.id);
   const likeCount = (data.likedBy || []).length;
   const replyCount = data.replyCount || 0;
+  const reported  = (data.reportedBy || []).includes(me?.id);
 
   const likeBtn = el.querySelector('.like-btn');
   if (likeBtn) {
@@ -250,4 +252,17 @@ export function updatePostCard(el, data, me, formatTimeFn = formatTime) {
 
   const timeEl = el.querySelector('.post-time');
   if (timeEl) timeEl.textContent = formatTimeFn(data.createdAt);
+
+  const reportBtn = el.querySelector('.post-report-btn');
+  if (reportBtn) {
+    if (reported) {
+      reportBtn.classList.add('reported');
+      reportBtn.disabled = true;
+      reportBtn.textContent = 'Reportado';
+    } else {
+      reportBtn.classList.remove('reported');
+      reportBtn.disabled = false;
+      reportBtn.textContent = 'Reportar post';
+    }
+  }
 }

@@ -284,38 +284,25 @@
         <span class="w1">WEVERSE </span><span class="w2">HANGOVER</span>
         <div class="tag">painel administrativo</div>
       </div>
-      <button id="reportsBtn" class="btn-reports" title="Denúncias">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
-          <line x1="4" y1="22" x2="4" y2="15"/>
-        </svg>
-        <span class="reports-badge hidden" id="reportsBadge"></span>
-      </button>
+      <div style="display:flex; gap:8px;">
+        <button id="searchToggleBtn" class="btn-reports" title="Buscar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </button>
+        <button id="reportsBtn" class="btn-reports" title="Denúncias">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+            <line x1="4" y1="22" x2="4" y2="15"/>
+          </svg>
+          <span class="reports-badge hidden" id="reportsBadge"></span>
+        </button>
+      </div>
     </header>
 
-    <!-- Stats -->
-    <div class="stats-bar">
-      <div class="stat-card"><div class="stat-value" id="statTotal">—</div><div class="stat-label">posts</div></div>
-      <div class="stat-card"><div class="stat-value" id="statUsers">—</div><div class="stat-label">usuários</div></div>
-      <div class="stat-card"><div class="stat-value" id="statDrawings">—</div><div class="stat-label">desenhos</div></div>
-      <div class="stat-card"><div class="stat-value" id="statLikes">—</div><div class="stat-label">curtidas</div></div>
-    </div>
-
-    <!-- Controls -->
-    <div class="controls-bar">
-      <input type="search" id="searchInput" class="search-input" placeholder="buscar por autor ou conteúdo…" />
-      <select id="filterSelect" class="filter-select">
-        <option value="all">todos os posts</option>
-        <option value="text">só textos</option>
-        <option value="drawing">só desenhos</option>
-      </select>
-      <button id="refreshBtn" class="btn-refresh">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-        </svg>
-        atualizar
-      </button>
-      <span class="posts-count-tools" id="postsCountTools"></span>
+    <div id="searchBar" style="display:none; margin-bottom:16px;">
+      <input type="search" id="searchInput" class="search-input" style="width:100%; box-sizing:border-box;" placeholder="buscar por autor ou conteúdo…" />
     </div>
 
     <!-- Composer -->
@@ -332,6 +319,22 @@
         </div>
       </div>
     </section>
+
+    <!-- Controls -->
+    <div class="controls-bar">
+      <select id="filterSelect" class="filter-select">
+        <option value="all">todos os posts</option>
+        <option value="text">só textos</option>
+        <option value="drawing">só desenhos</option>
+      </select>
+      <button id="refreshBtn" class="btn-refresh">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+        </svg>
+        atualizar
+      </button>
+      <span class="posts-count-tools" id="postsCountTools"></span>
+    </div>
 
     <!-- Feed -->
     <div id="postList" class="post-list"></div>
@@ -432,15 +435,13 @@
     const reportsOverlayCount= document.getElementById('reportsOverlayCount');
     const reportsOverlayList = document.getElementById('reportsOverlayList');
     const reportsBadge       = document.getElementById('reportsBadge');
+    const searchToggleBtn    = document.getElementById('searchToggleBtn');
+    const searchBar          = document.getElementById('searchBar');
     const searchInput        = document.getElementById('searchInput');
     const filterSelect       = document.getElementById('filterSelect');
     const refreshBtn         = document.getElementById('refreshBtn');
     const postList           = document.getElementById('postList');
     const postsCountTools    = document.getElementById('postsCountTools');
-    const statTotal          = document.getElementById('statTotal');
-    const statUsers          = document.getElementById('statUsers');
-    const statDrawings       = document.getElementById('statDrawings');
-    const statLikes          = document.getElementById('statLikes');
     const composeAvatar      = document.getElementById('composeAvatar');
     const composeText        = document.getElementById('composeText');
     const composeCount       = document.getElementById('composeCount');
@@ -591,6 +592,18 @@
       }
     });
 
+    // ── Search toggle ──
+    searchToggleBtn.addEventListener('click', () => {
+      if (searchBar.style.display === 'none') {
+        searchBar.style.display = 'block';
+        searchInput.focus();
+      } else {
+        searchBar.style.display = 'none';
+        searchInput.value = '';
+        renderPosts();
+      }
+    });
+
     // ── Load posts ──
     async function loadPosts() {
       postList.innerHTML = `<div class="state-loading">
@@ -602,24 +615,12 @@
         const q    = query(collection(db, POSTS), orderBy('createdAt', 'desc'), limit(120));
         const snap = await getDocs(q);
         allPosts   = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
-        updateStats();
         updateReports();
         renderPosts();
       } catch (e) {
         postList.innerHTML = `<div class="state-empty"><p>erro: ${e.message}</p></div>`;
         showToast('erro ao carregar', 'error');
       }
-    }
-
-    // ── Stats ──
-    function updateStats() {
-      const users    = new Set(allPosts.map(p => p.authorId)).size;
-      const drawings = allPosts.filter(p => p.type === 'drawing').length;
-      const likes    = allPosts.reduce((a, p) => a + (p.likedBy?.length || 0), 0);
-      statTotal.textContent    = allPosts.length;
-      statUsers.textContent    = users;
-      statDrawings.textContent = drawings;
-      statLikes.textContent    = likes;
     }
 
     // ── Reports ──
@@ -684,7 +685,6 @@
               await deleteDoc(doc(db, POSTS, post.docId));
               allPosts = allPosts.filter(p => p.docId !== post.docId);
               updateReports();
-              updateStats();
               renderPosts();
               showToast('post deletado', 'success');
             } catch (e) {
@@ -916,7 +916,6 @@
         await deleteDoc(doc(db, POSTS, post.docId));
         allPosts = allPosts.filter(p => p.docId !== post.docId);
         el.remove();
-        updateStats();
         showToast('post deletado', 'success');
       } catch (e) {
         el.classList.remove('deleting');

@@ -243,9 +243,10 @@ input, textarea { font-family: var(--font-main); }
   white-space: nowrap;
 }
 
-.menu-item:hover              { background: var(--surface-hover); color: var(--text-primary); }
+.menu-item:hover:not(:disabled) { background: var(--surface-hover); color: var(--text-primary); }
 .menu-item.menu-danger        { color: var(--red); }
-.menu-item.menu-danger:hover  { background: rgba(255, 59, 59, 0.1); color: var(--red); }
+.menu-item.menu-danger:hover:not(:disabled) { background: rgba(255, 59, 59, 0.1); color: var(--red); }
+.menu-item:disabled           { opacity: 0.5; cursor: not-allowed; }
 
 /* ════════════ REPLY THREAD ════════════ */
 .replies-section {
