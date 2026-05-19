@@ -633,6 +633,12 @@ async function reportPost(id, data) {
   try {
     await updateDoc(doc(db, POSTS, id), { reportedBy: arrayUnion(me.id) });
     showToast('post reportado');
+    // Notify moderators
+    fetch('/api/notify_mods', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ postId: id, text: \`"\${(current.message || '').slice(0, 30)}..." foi denunciado.\` })
+    }).catch(console.error);
   } catch (err) {
     showToast('erro ao reportar');
   }
