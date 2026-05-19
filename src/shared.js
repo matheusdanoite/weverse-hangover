@@ -2,8 +2,36 @@
 // WEVERSE HANGOVER — shared utilities
 // ═══════════════════════════════════════════
 
-// Close any open post menu when clicking outside
-document.addEventListener('click', () => {
+// ── Lightbox singleton ──
+let _lightbox = null;
+
+function getLightbox() {
+  if (_lightbox) return _lightbox;
+  const ov = document.createElement('div');
+  ov.className = 'lightbox-overlay';
+  ov.innerHTML = `
+    <img class="lightbox-img" src="" alt="desenho" />
+    <button class="lightbox-close" type="button">Fechar</button>
+  `;
+  const close = () => ov.classList.remove('open');
+  ov.querySelector('.lightbox-close').addEventListener('click', close);
+  ov.addEventListener('click', e => { if (e.target === ov) close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  document.body.appendChild(ov);
+  _lightbox = ov;
+  return ov;
+}
+
+// Global delegated listeners
+document.addEventListener('click', e => {
+  // Open lightbox on drawing click
+  if (e.target.matches('.post-drawing')) {
+    const lb = getLightbox();
+    lb.querySelector('.lightbox-img').src = e.target.src;
+    lb.classList.add('open');
+    return;
+  }
+  // Close any open post menu
   document.querySelectorAll('.post-menu.open').forEach(m => m.classList.remove('open'));
 });
 

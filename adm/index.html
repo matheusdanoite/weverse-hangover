@@ -594,8 +594,6 @@
       reported.forEach(post => {
         const count    = post.reportedBy?.length || 0;
         const isHidden = count >= 3;
-        const preview  = post.type === 'drawing' ? '[desenho]' : (post.message || '').slice(0, 90);
-
         const card = document.createElement('div');
         card.className = 'report-card' + (isHidden ? ' is-hidden' : '');
         card.innerHTML = `
@@ -606,7 +604,10 @@
               <span class="report-status ${isHidden ? 'is-hidden' : 'is-visible'}">${isHidden ? 'oculto' : 'visível'}</span>
             </span>
           </div>
-          <div class="report-preview">${escapeHTML(preview)}</div>
+          ${post.type === 'drawing'
+            ? `<img class="post-drawing" src="${post.message}" alt="desenho" loading="lazy" />`
+            : `<div class="report-preview">${escapeHTML((post.message || '').slice(0, 90))}</div>`
+          }
           <div class="report-actions">
             ${isHidden ? `<button class="btn-reinstate">reexibir</button>` : ''}
             <button class="btn-report-del">deletar</button>
@@ -742,7 +743,10 @@
           <span class="reply-time">${formatTimeAbs(r.createdAt)}</span>
         </div>
         <div class="reply-content">
-          ${r.type === 'drawing' ? '[desenho]' : escapeHTML(r.message || '')}
+          ${r.type === 'drawing'
+            ? `<img class="post-drawing" src="${r.message}" alt="desenho" loading="lazy" />`
+            : escapeHTML(r.message || '')
+          }
         </div>
       `;
       item.appendChild(body);
