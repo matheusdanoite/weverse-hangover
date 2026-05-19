@@ -27,6 +27,7 @@
   --font-main: 'Outfit', 'Noto Sans KR', sans-serif;
 }
 
+body { font-family: var(--font-main); }
 button { font-family: var(--font-main); cursor: pointer; }
 input, textarea { font-family: var(--font-main); }
 .hidden { display: none !important; }
@@ -48,6 +49,7 @@ input, textarea { font-family: var(--font-main); }
 
 /* ════════════ POST CARD ════════════ */
 .post {
+  position: relative;
   background: var(--surface-1);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -143,6 +145,53 @@ input, textarea { font-family: var(--font-main); }
 .action-btn.delete-btn { display: none; color: var(--red); }
 .action-btn.delete-btn:hover { background: rgba(255, 59, 59, 0.15); color: var(--red); }
 .tools-active .action-btn.delete-btn { display: flex; }
+
+/* ════════════ POST CONTEXT MENU ════════════ */
+.post-menu {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+}
+
+.post-menu-btn {
+  width: 28px; height: 28px;
+  border-radius: 50%; border: none;
+  background: transparent;
+  color: var(--text-muted);
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s, color 0.2s;
+}
+
+.post-menu-btn:hover { background: var(--surface-hover); color: var(--text-secondary); }
+
+.post-menu-dropdown {
+  position: absolute;
+  right: 0; top: 32px;
+  background: rgba(16, 6, 32, 0.98);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  min-width: 152px;
+  z-index: 200;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+}
+
+.post-menu.open .post-menu-dropdown { display: flex; }
+
+.menu-item {
+  padding: 10px 14px;
+  background: transparent; border: none;
+  color: var(--text-secondary); font-size: 0.84rem;
+  text-align: left; cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.menu-item:hover              { background: var(--surface-hover); color: var(--text-primary); }
+.menu-item.menu-danger        { color: var(--red); }
+.menu-item.menu-danger:hover  { background: rgba(255, 59, 59, 0.1); color: var(--red); }
 
 /* ════════════ REPLY THREAD ════════════ */
 .replies-section {
