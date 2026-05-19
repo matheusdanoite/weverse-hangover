@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Weverse Hangover</title>
+  <meta name="description" content="Mural ao vivo da Hangul Hangover" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&family=Noto+Sans+KR:wght@400;700&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="./board.css" />
+</head>
+
+<body>
+  <div class="bg-gradient-anim"></div>
+  <div class="bg-particles" id="bgParticles"></div>
+
+  <header class="board-header">
+    <div class="board-logo">
+      <span class="board-logo-hangul">WEVERSE</span>
+      <span class="board-logo-hangover">HANGOVER</span>
+    </div>
+    <div class="view-badge" id="viewBadge">
+      <span class="view-badge-icon" id="viewBadgeIcon">♥</span>
+      <span class="view-badge-label" id="viewBadgeLabel">mais curtidos</span>
+    </div>
+    <div class="live-indicator">
+      <span class="live-dot"></span>
+      <span class="live-label">poste em <span class="live-link">weverse-hangover.pages.dev</span></span>
+    </div>
+  </header>
+
+  <main class="board-scene" id="boardGrid"></main>
+
+  <div class="empty-state" id="emptyState">
+    <div class="empty-icon">✦</div>
+    <p>aguardando o primeiro post...</p>
+    <p class="empty-sub">acesse o scrapbook e poste algo</p>
+  </div>
+
+  <script type="module" src="./board.js"></script>
+</body>
+
+</html>

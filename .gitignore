@@ -1,0 +1,22 @@
+# Environment & secrets
+.dev.vars
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.sw?
+
+# Wrangler local cache
+.wrangler/
+
+# Logs
+*.log
+npm-debug.log*
