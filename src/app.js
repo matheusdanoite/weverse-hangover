@@ -840,7 +840,9 @@ function renderFeed() {
   const newPosts = [];
   const seenPosts = [];
   for (const [id, data] of postsMap.entries()) {
-    if ((data.reportedBy?.length || 0) >= 3) continue;
+    const _rc = data.reportedBy?.length || 0;
+    const _mc = data.maintainedCount || 0;
+    if (_rc >= 3 && _rc > _mc) continue;
     if (seenAtStart.has(id)) seenPosts.push([id, data]);
     else newPosts.push([id, data]);
   }
