@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,40 +7,48 @@
   <meta name="description" content="Mural ao vivo da Hangul Hangover" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&family=Noto+Sans+KR:wght@400;700&display=swap"
-    rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;600;700;800&family=Outfit:wght@300;400;600;700;800;900&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./board.css" />
 </head>
-
 <body>
-  <div class="bg-gradient-anim"></div>
-  <div class="bg-particles" id="bgParticles"></div>
+  <div class="kinetic-bg tint-default" id="kineticBg"></div>
 
   <header class="board-header">
-    <div class="board-logo">
-      <span class="board-logo-hangul">WEVERSE</span>
-      <span class="board-logo-hangover">HANGOVER</span>
+    <div class="header-left">
+      <span class="live-dot-hd"></span>
+      <div class="wordmark">
+        <span class="wm-weverse">WEVERSE</span>
+        <span class="wm-hangover">HANGOVER</span>
+      </div>
     </div>
-    <div class="view-badge" id="viewBadge">
-      <span class="view-badge-icon" id="viewBadgeIcon">♥</span>
-      <span class="view-badge-label" id="viewBadgeLabel">mais curtidos</span>
-    </div>
-    <div class="live-indicator">
-      <span class="live-dot"></span>
-      <span class="live-label">poste em <span class="live-link">weverse-hangover.pages.dev</span></span>
+    <div class="header-right">
+      <div class="post-count-badge" id="postCountBadge">
+        POSTS: <strong id="postCountVal">–</strong>
+      </div>
+      <div class="live-time-badge">
+        <span class="live-dot-sm"></span>
+        AO VIVO · <span id="liveClock">--:--</span>
+      </div>
     </div>
   </header>
+
+  <div class="view-label-wrap" id="viewLabelWrap">
+    <div class="view-label-text" id="viewLabelText"></div>
+    <div class="view-label-sub" id="viewLabelSub"></div>
+  </div>
 
   <main class="board-scene" id="boardGrid"></main>
 
   <div class="empty-state" id="emptyState">
     <div class="empty-icon">✦</div>
     <p>aguardando o primeiro post...</p>
-    <p class="empty-sub">acesse o scrapbook e poste algo</p>
+    <p class="empty-sub">acesse e poste algo</p>
+  </div>
+
+  <div class="footer-ticker">
+    <div class="ticker-track" id="tickerTrack"></div>
   </div>
 
   <script type="module" src="./board.js"></script>
 </body>
-
 </html>

@@ -365,6 +365,9 @@ async function deleteUserData() {
 // ═══════════════════════════════════════════
 // COMPOSER
 // ═══════════════════════════════════════════
+const composerPill = document.getElementById('composerPill');
+const composerExpandedPanel = document.getElementById('composerExpandedPanel');
+const pillInput = document.getElementById('pillInput');
 const messageField = document.getElementById('messageField');
 const charCount = document.getElementById('charCount');
 const charCountWrapper = document.getElementById('charCountWrapper');
@@ -469,6 +472,7 @@ toggleDraw.addEventListener('click', () => {
     messageField.classList.add('hidden');
     charCountWrapper.classList.add('hidden');
     drawControls.classList.remove('hidden');
+    expandComposer();
   } else {
     inputMode = 'text';
     toggleDraw.classList.remove('active');
@@ -481,14 +485,45 @@ toggleDraw.addEventListener('click', () => {
   updateSubmitDisabled();
 });
 
-// Auto-resize textarea
+// ── Pill expand / collapse ──
+function expandComposer() {
+  composerPill.classList.add('active');
+  composerExpandedPanel.style.display = 'block';
+}
+
+function collapseComposer() {
+  if (inputMode !== 'text') return;
+  if (pillInput.value.trim() || messageField.value.trim()) return;
+  composerPill.classList.remove('active');
+  composerExpandedPanel.style.display = 'none';
+}
+
+pillInput.addEventListener('focus', expandComposer);
+
+pillInput.addEventListener('input', () => {
+  messageField.value = pillInput.value;
+  messageField.style.height = 'auto';
+  messageField.style.height = messageField.scrollHeight + 'px';
+  const len = pillInput.value.length;
+  charCount.textContent = len;
+  charCountWrapper.classList.toggle('over', len > 300);
+  updateSubmitDisabled();
+});
+
+// Auto-resize textarea + sync back to pill
 messageField.addEventListener('input', () => {
+  pillInput.value = messageField.value.split('\n')[0].slice(0, 60);
   messageField.style.height = 'auto';
   messageField.style.height = messageField.scrollHeight + 'px';
   const len = messageField.value.length;
   charCount.textContent = len;
   charCountWrapper.classList.toggle('over', len > 300);
   updateSubmitDisabled();
+});
+
+document.addEventListener('click', e => {
+  if (composerPill.contains(e.target) || composerExpandedPanel.contains(e.target)) return;
+  collapseComposer();
 });
 
 function updateSubmitDisabled() {
@@ -536,6 +571,7 @@ async function handleSubmit() {
     await addDoc(collection(db, POSTS), docData);
 
     messageField.value = '';
+    pillInput.value = '';
     messageField.style.height = 'auto';
     charCount.textContent = '0';
     ctx.fillStyle = '#ffffff';
@@ -559,15 +595,77 @@ async function handleSubmit() {
 // FEED RENDERING
 // ═══════════════════════════════════════════
 const feed = document.getElementById('feed');
-const seenFeedEl = document.getElementById('seenFeed');
-const seenSection = document.getElementById('seenSection');
-const seenToggle = document.getElementById('seenToggle');
-const seenCountEl = document.getElementById('seenCount');
 const emptyFeed = document.getElementById('emptyFeed');
 
-seenToggle.addEventListener('click', () => {
-  const isOpen = seenSection.classList.toggle('open');
-  seenFeedEl.classList.toggle('hidden', !isOpen);
+let activeTab = 'all';
+
+function getPostsForTab(tab) {
+  const all = [];
+  for (const [id, data] of postsMap.entries()) {
+    const _rc = data.reportedBy?.length || 0;
+    const _mc = data.maintainedCount || 0;
+    if (_rc >= 3 && _rc > _mc) continue;
+    all.push([id, data]);
+  }
+  const cmp = (a, b) => (b[1].createdAt?.seconds || 0) - (a[1].createdAt?.seconds || 0);
+  switch (tab) {
+    case 'texts':    return all.filter(([, d]) => d.type !== 'drawing').sort(cmp);
+    case 'drawings': return all.filter(([, d]) => d.type === 'drawing').sort(cmp);
+    case 'top':      return all.slice().sort((a, b) => (b[1].likedBy?.length || 0) - (a[1].likedBy?.length || 0)).slice(0, 10);
+    case 'mods':     return all.filter(([, d]) => MOD_NAMES.has(d.author)).sort(cmp);
+    default:         return all.sort(cmp);
+  }
+}
+
+function updateTabCounts() {
+  const all = [];
+  for (const [, data] of postsMap.entries()) {
+    const _rc = data.reportedBy?.length || 0;
+    const _mc = data.maintainedCount || 0;
+    if (_rc >= 3 && _rc > _mc) continue;
+    all.push(data);
+  }
+  const cntAll      = document.getElementById('cnt-all');
+  const cntTexts    = document.getElementById('cnt-texts');
+  const cntDrawings = document.getElementById('cnt-drawings');
+  const cntMods     = document.getElementById('cnt-mods');
+  if (cntAll)      cntAll.textContent      = all.length;
+  if (cntTexts)    cntTexts.textContent    = all.filter(d => d.type !== 'drawing').length;
+  if (cntDrawings) cntDrawings.textContent = all.filter(d => d.type === 'drawing').length;
+  if (cntMods)     cntMods.textContent     = all.filter(d => MOD_NAMES.has(d.author)).length;
+}
+
+// ── Feed Tabs ──
+const feedTabs = document.getElementById('feedTabs');
+
+function moveIndicator(btn) {
+  if (!btn || !feedTabs) return;
+  const rect     = btn.getBoundingClientRect();
+  const hostRect = feedTabs.getBoundingClientRect();
+  feedTabs.style.setProperty('--ind-x', (rect.left - hostRect.left + feedTabs.scrollLeft) + 'px');
+  feedTabs.style.setProperty('--ind-w', rect.width + 'px');
+}
+
+feedTabs.addEventListener('click', e => {
+  const btn = e.target.closest('.feed-tab');
+  if (!btn) return;
+  document.querySelectorAll('.feed-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  activeTab = btn.dataset.tab;
+  moveIndicator(btn);
+  btn.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  renderFeed();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+window.addEventListener('resize', () => {
+  const active = document.querySelector('.feed-tab.active');
+  if (active) moveIndicator(active);
+});
+
+requestAnimationFrame(() => {
+  const active = document.querySelector('.feed-tab.active');
+  if (active) moveIndicator(active);
 });
 
 const cardElements = new Map();
@@ -792,9 +890,7 @@ const postsQ = query(collection(db, POSTS), orderBy('createdAt', 'desc'), limit(
 onSnapshot(postsQ, (snapshot) => {
   if (snapshot.empty) {
     feed.innerHTML = '';
-    seenFeedEl.innerHTML = '';
     emptyFeed.classList.remove('hidden');
-    seenSection.classList.add('hidden');
     return;
   }
   emptyFeed.classList.add('hidden');
@@ -860,38 +956,64 @@ updateFeedBtn.addEventListener('click', () => {
 });
 
 function renderFeed() {
-  const newPosts = [];
-  const seenPosts = [];
-  for (const [id, data] of postsMap.entries()) {
-    const _rc = data.reportedBy?.length || 0;
-    const _mc = data.maintainedCount || 0;
-    if (_rc >= 3 && _rc > _mc) continue;
-    if (seenAtStart.has(id)) seenPosts.push([id, data]);
-    else newPosts.push([id, data]);
+  const posts = getPostsForTab(activeTab);
+  updateTabCounts();
+
+  // Rank strip (only for Trending)
+  let rankStrip = feed.querySelector('.rank-strip');
+  if (activeTab === 'top') {
+    if (!rankStrip) {
+      rankStrip = document.createElement('div');
+      rankStrip.className = 'rank-strip';
+      rankStrip.textContent = 'posts mais curtidos da noite';
+      feed.insertBefore(rankStrip, feed.firstChild);
+    }
+  } else {
+    rankStrip?.remove();
   }
-  const cmp = (a, b) => (b[1].createdAt?.seconds || 0) - (a[1].createdAt?.seconds || 0);
-  newPosts.sort(cmp);
-  seenPosts.sort(cmp);
 
-  renderInto(feed, newPosts);
-  renderInto(seenFeedEl, seenPosts);
+  if (posts.length === 0) {
+    feed.querySelectorAll('[data-id]').forEach(el => {
+      seenObserver.unobserve(el);
+      replySubObserver.unobserve(el);
+      const id = el.dataset.id;
+      if (replySubs.has(id)) { replySubs.get(id)(); replySubs.delete(id); }
+      cardElements.delete(id);
+      el.remove();
+    });
+    if (!feed.querySelector('.tab-empty')) {
+      const empty = document.createElement('div');
+      empty.className = 'tab-empty';
+      empty.innerHTML = '<span class="icon">✦</span><p>nada por aqui ainda.</p>';
+      feed.appendChild(empty);
+    }
+    return;
+  }
 
-  seenCountEl.textContent = seenPosts.length;
-  seenSection.classList.toggle('hidden', seenPosts.length === 0);
+  feed.querySelector('.tab-empty')?.remove();
+  renderInto(feed, posts);
+
+  // Rank badges
+  feed.querySelectorAll('.post[data-id]').forEach((el, i) => {
+    if (activeTab === 'top') {
+      el.classList.add('post-rank');
+      el.dataset.rank = '#' + (i + 1);
+    } else {
+      el.classList.remove('post-rank');
+      el.removeAttribute('data-rank');
+    }
+  });
 }
 
 function renderInto(container, list) {
   const desiredIds = list.map(([id]) => id);
-  Array.from(container.children).forEach(child => {
+  // Only operate on elements that represent posts (have data-id)
+  Array.from(container.querySelectorAll('[data-id]')).forEach(child => {
     if (!desiredIds.includes(child.dataset.id)) {
       seenObserver.unobserve(child);
       replySubObserver.unobserve(child);
-      // Unsubscribe replies for removed cards
       const id = child.dataset.id;
-      if (replySubs.has(id)) {
-        replySubs.get(id)();
-        replySubs.delete(id);
-      }
+      if (replySubs.has(id)) { replySubs.get(id)(); replySubs.delete(id); }
       child.remove();
       cardElements.delete(id);
     }
@@ -904,7 +1026,9 @@ function renderInto(container, list) {
     } else {
       updatePostElement(existing, id, data);
     }
-    const current = container.children[idx];
+    // Position among data-id siblings only
+    const postsInContainer = Array.from(container.querySelectorAll('[data-id]'));
+    const current = postsInContainer[idx];
     if (current !== existing) container.insertBefore(existing, current || null);
   });
 }
@@ -913,12 +1037,12 @@ function renderInto(container, list) {
 setInterval(() => {
   if (document.visibilityState === 'hidden') return;
   const vh = window.innerHeight;
-  postsMap.forEach((data, id) => {
-    const el = cardElements.get(id);
-    if (!el || !el.isConnected) return;
+  cardElements.forEach((el, id) => {
+    if (!el.isConnected) return;
     const { top, bottom } = el.getBoundingClientRect();
     if (bottom < 0 || top > vh) return;
-    updatePostCard(el, data, me);
+    const data = postsMap.get(id);
+    if (data) updatePostCard(el, data, me);
   });
 }, 30000);
 
