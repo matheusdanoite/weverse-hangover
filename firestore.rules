@@ -17,9 +17,7 @@ service cloud.firestore {
     }
 
     match /hangul_fcm_tokens/{tokenId} {
-      // For now, allow anyone to write their token. 
-      // In a real prod environment, restrict this to authenticated users or mods.
-      allow read: if true;
+      allow read: if false;
       allow write: if true;
     }
 

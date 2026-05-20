@@ -1,8 +1,17 @@
 export async function onRequestPost(context) {
   const { request, env } = context;
+
+  const internalKey = env.INTERNAL_KEY;
+  if (internalKey && request.headers.get('X-Internal-Key') !== internalKey) {
+    return new Response('Forbidden', { status: 403 });
+  }
+
   try {
     const { postId, text } = await request.json();
-    if (!postId) return new Response('Missing postId', { status: 400 });
+    if (!postId || !/^[a-zA-Z0-9]{10,30}$/.test(postId)) {
+      return new Response('Invalid postId', { status: 400 });
+    }
+    const safeText = typeof text === 'string' ? text.slice(0, 100) : '';
 
     // 1. Get Google OAuth Token (Requires Firebase Service Account)
     const serviceAccount = env.FIREBASE_SERVICE_ACCOUNT ? JSON.parse(env.FIREBASE_SERVICE_ACCOUNT) : null;
@@ -46,7 +55,7 @@ export async function onRequestPost(context) {
           token: targetToken,
           notification: {
             title: "Nova Denúncia no Hangul",
-            body: text || "Um post acaba de ser denunciado."
+            body: safeText || "Um post acaba de ser denunciado."
           },
           webpush: {
             fcm_options: {
@@ -70,8 +79,8 @@ export async function onRequestPost(context) {
 
     return new Response(JSON.stringify({ success: true, count: tokens.length }), { status: 200 });
 
-  } catch (error) {
-    return new Response(error.message, { status: 500 });
+  } catch {
+    return new Response('Internal Server Error', { status: 500 });
   }
 }
 

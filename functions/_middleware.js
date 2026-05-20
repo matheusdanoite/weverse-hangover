@@ -3,6 +3,9 @@ const BLOCKED = new Set([
   '/.firebaserc',
   '/firebase.json',
   '/firestore.rules',
+  '/wrangler.toml',
+  '/CLAUDE.md',
+  '/.gitignore',
 ]);
 
 export function onRequest(context) {
