@@ -5,3 +5,5 @@ FIREBASE_STORAGE_BUCKET=
 FIREBASE_MESSAGING_SENDER_ID=
 FIREBASE_APP_ID=
 MODERATOR_PROFILES=[{"email":"...","id":"adm_...","name":"...","gradient":["#hex1","#hex2"]}]
+FIREBASE_SERVICE_ACCOUNT={"type":"service_account","project_id":"...","private_key":"...","client_email":"..."}
+INTERNAL_KEY=troque-por-uma-string-aleatoria-longa

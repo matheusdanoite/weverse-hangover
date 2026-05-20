@@ -11,6 +11,7 @@ import {
 const firebaseConfig = await fetch('/api/config').then(r => r.json());
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
+const MOD_NAMES = new Set((firebaseConfig.moderatorProfiles || []).map(p => p.name));
 const POSTS = 'hangul_messages';
 
 // ── DOM ──
@@ -412,7 +413,8 @@ function buildPostCard(post, { rank, featured = false, delay = 0 } = {}) {
 
   let body;
   if (isDrawing) {
-    body = `<div class="drawing-wrap"><img class="card-drawing" src="${data.message}" alt="desenho" loading="lazy"/></div>`;
+    const drawingSrc = typeof data.message === 'string' && data.message.startsWith('data:image/') ? data.message : '';
+    body = drawingSrc ? `<div class="drawing-wrap"><img class="card-drawing" src="${drawingSrc}" alt="desenho" loading="lazy"/></div>` : '';
   } else {
     const msg = data.message || '';
     const fs  = textFS(msg.length, featured);
@@ -430,7 +432,7 @@ function buildPostCard(post, { rank, featured = false, delay = 0 } = {}) {
       <div class="card-author">
         <div style="display:flex;align-items:center;gap:6px;min-width:0;">
           <span class="card-author-name">${escapeHTML(data.author || 'anônimo')}</span>
-          ${['matheusdanoite','anithesun'].includes(data.author) ? '<span class="card-mod-star">★</span>' : ''}
+          ${MOD_NAMES.has(data.author) ? '<span class="card-mod-star">★</span>' : ''}
         </div>
         <span class="card-time">${formatTime(data.createdAt)}</span>
       </div>
@@ -464,8 +466,9 @@ function buildReplyCard(reply, delay = 0) {
   const isDrawing = reply.type === 'drawing';
   const msg       = reply.message || '';
 
+  const drawingSrc = isDrawing && msg.startsWith('data:image/') ? msg : '';
   const body = isDrawing
-    ? `<div class="reply-drawing-wrap"><img src="${msg}" alt="desenho" loading="lazy"/></div>`
+    ? (drawingSrc ? `<div class="reply-drawing-wrap"><img src="${drawingSrc}" alt="desenho" loading="lazy"/></div>` : '')
     : `<p class="reply-card-text">${escapeHTML(msg)}</p>`;
 
   card.innerHTML = `

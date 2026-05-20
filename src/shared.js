@@ -109,8 +109,11 @@ export function buildPostCard(id, data, opts = {}) {
   const reported = (data.reportedBy || []).includes(me?.id);
   const grad   = gradientCSS(data.gradient?.length === 2 ? data.gradient : null);
 
+  const drawingSrc = isDrawing && typeof data.message === 'string' && data.message.startsWith('data:image/')
+    ? data.message
+    : '';
   const contentHTML = isDrawing
-    ? `<img class="post-drawing" src="${data.message}" alt="desenho" loading="lazy" />`
+    ? (drawingSrc ? `<img class="post-drawing" src="${drawingSrc}" alt="desenho" loading="lazy" />` : '')
     : `<div class="post-content">${escapeHTML(data.message || '')}</div>`;
 
   const el = document.createElement('article');

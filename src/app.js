@@ -7,7 +7,7 @@ import {
   getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
 } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js';
 import {
-  getFirestore, collection, addDoc, doc, updateDoc, serverTimestamp,
+  getFirestore, collection, collectionGroup, addDoc, doc, updateDoc, serverTimestamp,
   query, orderBy, limit, onSnapshot, arrayUnion, arrayRemove, increment,
   where, getDocs, deleteDoc, getDoc, setDoc
 } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js';
@@ -345,10 +345,13 @@ ${postsHTML}
 async function deleteUserData() {
   showToast('deletando dados...');
   try {
-    const q = query(collection(db, POSTS), where('authorId', '==', me.id));
-    const snap = await getDocs(q);
-    await Promise.all(snap.docs.map(d => deleteDoc(doc(db, POSTS, d.id))));
-    // Libera o nome para que outro usuário possa usá-lo futuramente
+    const postsQ = query(collection(db, POSTS), where('authorId', '==', me.id));
+    const repliesQ = query(collectionGroup(db, 'replies'), where('authorId', '==', me.id));
+    const [postsSnap, repliesSnap] = await Promise.all([getDocs(postsQ), getDocs(repliesQ)]);
+    await Promise.all([
+      ...postsSnap.docs.map(d => deleteDoc(d.ref)),
+      ...repliesSnap.docs.map(d => deleteDoc(d.ref)),
+    ]);
     try { await deleteDoc(doc(db, USERS, me.name.toLowerCase())); } catch {}
     Object.values(LS).forEach(k => localStorage.removeItem(k));
     showToast('dados deletados!');
@@ -509,9 +512,20 @@ async function handleSubmit() {
   btnLoading.classList.remove('hidden');
 
   try {
+    let message;
+    if (inputMode === 'text') {
+      message = text;
+    } else {
+      message = drawCanvas.toDataURL('image/jpeg', 0.7);
+      if (message.length > 200_000) {
+        showToast('desenho muito grande, simplifique um pouco');
+        return;
+      }
+    }
+
     const docData = {
       type: inputMode === 'text' ? 'text' : 'drawing',
-      message: inputMode === 'text' ? text : drawCanvas.toDataURL('image/png'),
+      message,
       author: me.name,
       authorId: me.id,
       gradient: me.gradient,
@@ -636,7 +650,10 @@ async function reportPost(id, data) {
     // Notify moderators
     fetch('/api/notify_mods', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Internal-Key': firebaseConfig.internalKey || '',
+      },
       body: JSON.stringify({ postId: id, text: `"${(current.message || '').slice(0, 30)}..." foi denunciado.` })
     }).catch(console.error);
   } catch (err) {
@@ -892,11 +909,16 @@ function renderInto(container, list) {
   });
 }
 
-// Refresh relative timestamps
+// Refresh relative timestamps — only for cards visible in the viewport
 setInterval(() => {
+  if (document.visibilityState === 'hidden') return;
+  const vh = window.innerHeight;
   postsMap.forEach((data, id) => {
     const el = cardElements.get(id);
-    if (el) updatePostCard(el, data, me);
+    if (!el || !el.isConnected) return;
+    const { top, bottom } = el.getBoundingClientRect();
+    if (bottom < 0 || top > vh) return;
+    updatePostCard(el, data, me);
   });
 }, 30000);
 

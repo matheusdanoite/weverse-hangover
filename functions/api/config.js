@@ -11,11 +11,12 @@ export function onRequest(context) {
       messagingSenderId:  env.FIREBASE_MESSAGING_SENDER_ID,
       appId:              env.FIREBASE_APP_ID,
       moderatorProfiles,
+      internalKey:        env.INTERNAL_KEY || '',
     }),
     {
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=3600',
+        'Cache-Control': 'private, max-age=3600',
       },
     }
   );
