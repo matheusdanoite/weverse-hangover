@@ -128,7 +128,6 @@ export function buildPostCard(id, data, opts = {}) {
         <span class="post-author">${escapeHTML(data.author || 'anônimo')}</span>
         ${isMod  ? '<span class="mod-star">★</span>' : ''}
         <span class="post-time">${formatTimeFn(data.createdAt)}</span>
-        ${isMine ? '<span class="post-mine-tag">você</span>' : ''}
         <span class="post-doc-id">${id}</span>
       </div>
       ${contentHTML}
@@ -189,12 +188,23 @@ export function buildPostCard(id, data, opts = {}) {
   }
 
   el.querySelector('.reply-btn').addEventListener('click', () => {
-    const input = el.querySelector('.reply-input');
-    if (input) {
-      input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      input.focus();
+    const section = el.querySelector('.replies-section');
+    const composer = section?.querySelector('.reply-composer');
+    if (composer) {
+      composer.classList.toggle('open');
+      if (composer.classList.contains('open')) {
+        composer.querySelector('.reply-input')?.focus();
+        composer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
     } else if (onReplyClick) {
       onReplyClick(el);
+      requestAnimationFrame(() => {
+        const newComposer = section?.querySelector('.reply-composer');
+        if (newComposer) {
+          newComposer.classList.add('open');
+          newComposer.querySelector('.reply-input')?.focus();
+        }
+      });
     }
   });
 
