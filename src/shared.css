@@ -10,6 +10,7 @@
   --purple-mid: #1a0a2e;
   --purple-accent: #9b59ff;
   --blue-electric: #00d4ff;
+  --gold: #ffd700;
   --red: #ff3b3b;
   --green: #34e89e;
   --bg: #1a0a2e;
@@ -25,6 +26,7 @@
   --radius-md: 12px;
   --radius-sm: 8px;
   --font-main: 'Outfit', 'Noto Sans KR', sans-serif;
+  --topbar-h: 56px;
 }
 
 body { font-family: var(--font-main); }
@@ -177,23 +179,31 @@ input, textarea { font-family: var(--font-main); }
 
 .post-actions {
   display: flex;
-  gap: 2px;
-  margin-top: 4px;
+  gap: 4px;
+  margin-top: 8px;
 }
 
 .action-btn {
-  display: flex; align-items: center; gap: 5px;
-  padding: 7px 10px; border-radius: 999px; border: none;
-  background: transparent; color: var(--text-muted);
-  font-size: 0.82rem; font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1;
   transition: background 0.2s, color 0.2s;
   min-height: 36px;
 }
 
+.action-btn svg            { display: block; flex-shrink: 0; }
+.action-btn .count         { line-height: 1; font-variant-numeric: tabular-nums; margin-top: 1px; }
 .action-btn:hover          { background: rgba(255, 45, 120, 0.1); color: var(--pink-light); }
 .action-btn.liked          { color: var(--pink-neon); }
 .action-btn.liked svg      { fill: var(--pink-neon); }
-.action-btn .count         { font-variant-numeric: tabular-nums; }
 
 /* Delete — hidden by default, shown when .tools-active wraps the feed */
 .action-btn.delete-btn { display: none; color: var(--red); }
