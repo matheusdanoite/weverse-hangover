@@ -377,17 +377,20 @@ const drawSection = document.getElementById('drawSection');
 const drawCanvas = document.getElementById('drawCanvas');
 const brushColorInput = document.getElementById('brushColor');
 const colorPreview = document.getElementById('colorPreview');
-const clearCanvasBtn = document.getElementById('clearCanvas');
 const drawControls = document.getElementById('drawControls');
+const eraserBtn = document.getElementById('eraserBtn');
+const rainbowBtn = document.getElementById('rainbowBtn');
 
 const CANVAS_W = 600;
 const CANVAS_H = 800;
 
 let inputMode = 'text';
 let brushColor = '#ff2d78';
-const brushRadius = 5; // medium only
+const brushRadius = 5;
 let isDrawing = false;
 let lastX = 0, lastY = 0;
+let isRainbow = false;
+let rainbowHue = 0;
 
 const ctx = drawCanvas.getContext('2d');
 ctx.lineCap = 'round';
@@ -417,6 +420,14 @@ function getCanvasPos(e) {
   return { x: (cx - rect.left) * sx, y: (cy - rect.top) * sy };
 }
 
+function currentColor() {
+  if (isRainbow) {
+    rainbowHue = (rainbowHue + 4) % 360;
+    return `hsl(${rainbowHue}, 100%, 50%)`;
+  }
+  return brushColor;
+}
+
 function startDraw(e) {
   e.preventDefault();
   isDrawing = true;
@@ -424,7 +435,7 @@ function startDraw(e) {
   lastX = p.x; lastY = p.y;
   ctx.beginPath();
   ctx.arc(lastX, lastY, brushRadius, 0, Math.PI * 2);
-  ctx.fillStyle = brushColor;
+  ctx.fillStyle = currentColor();
   ctx.fill();
 }
 
@@ -435,7 +446,7 @@ function draw(e) {
   ctx.beginPath();
   ctx.moveTo(lastX, lastY);
   ctx.lineTo(p.x, p.y);
-  ctx.strokeStyle = brushColor;
+  ctx.strokeStyle = currentColor();
   ctx.lineWidth = brushRadius * 2;
   ctx.stroke();
   lastX = p.x; lastY = p.y;
@@ -451,14 +462,33 @@ drawCanvas.addEventListener('touchstart', startDraw, { passive: false });
 drawCanvas.addEventListener('touchmove', draw, { passive: false });
 drawCanvas.addEventListener('touchend', stopDraw);
 
+function deactivateRainbow() {
+  isRainbow = false;
+  rainbowBtn.classList.remove('rainbow-active');
+}
+
 brushColorInput.addEventListener('input', (e) => {
   brushColor = e.target.value;
   colorPreview.style.background = brushColor;
+  deactivateRainbow();
+  eraserBtn.classList.remove('eraser-active');
 });
 
-clearCanvasBtn.addEventListener('click', () => {
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+eraserBtn.addEventListener('click', () => {
+  brushColor = '#ffffff';
+  colorPreview.style.background = '#ffffff';
+  deactivateRainbow();
+  eraserBtn.classList.toggle('eraser-active');
+});
+
+rainbowBtn.addEventListener('click', () => {
+  isRainbow = !isRainbow;
+  rainbowBtn.classList.toggle('rainbow-active', isRainbow);
+  eraserBtn.classList.remove('eraser-active');
+  if (isRainbow) {
+    brushColor = '#ff2d78';
+    colorPreview.style.background = brushColor;
+  }
 });
 
 toggleDraw.addEventListener('click', () => {
@@ -477,6 +507,8 @@ toggleDraw.addEventListener('click', () => {
     composerPill.classList.remove('draw-mode');
     charCountWrapper.classList.remove('hidden');
     drawControls.classList.add('hidden');
+    deactivateRainbow();
+    eraserBtn.classList.remove('eraser-active');
     messageField.focus();
   }
   updateToggleIcon();

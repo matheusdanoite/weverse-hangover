@@ -118,12 +118,14 @@ input, textarea { font-family: var(--font-main); }
 }
 
 .post-drawing {
-  max-width: 180px; width: 100%; aspect-ratio: 3 / 4;
+  max-width: 250px; width: 100%; aspect-ratio: 3 / 4;
   border-radius: var(--radius-md); background: #fff;
-  margin-top: 4px; border: 1px solid var(--border-subtle);
+  margin: 4px auto 0; border: 1px solid var(--border-subtle);
   object-fit: cover; display: block;
   cursor: pointer;
   touch-action: manipulation;
+  position: relative;
+  left: -26px;
 }
 
 /* ════════════ LIGHTBOX ════════════ */
@@ -375,7 +377,8 @@ input, textarea { font-family: var(--font-main); }
   flex-shrink: 0; transition: opacity 0.2s, transform 0.15s; cursor: pointer;
 }
 
-.reply-send:disabled { opacity: 0.35; cursor: not-allowed; }
+.reply-send:disabled               { opacity: 0.35; cursor: not-allowed; }
+.reply-send:not(:disabled):hover   { transform: scale(1.08); }
 
 /* ════════════ MAINTAIN NOTE ════════════ */
 .maintain-sep { height: 1px; background: var(--border-subtle); margin: 8px 0 6px; }

@@ -183,21 +183,31 @@
     <div class="composer-wrapper">
       <div class="composer-pill" id="composerPill">
         <div class="composer-top-row">
-          <textarea id="messageField" class="composer-textarea"
-            placeholder="o que tá rolando na festa?" maxlength="300"
-            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
-          <div class="draw-inline-tools hidden" id="drawControls">
-            <div class="color-picker-wrapper">
-              <div id="colorPreview" class="color-preview"></div>
-              <input type="color" id="brushColor" value="#ff2d78" class="color-input" />
+          <div class="composer-input-slot">
+            <textarea id="messageField" class="composer-textarea"
+              placeholder="o que tá rolando na festa?" maxlength="300"
+              autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+            <div class="draw-toolbar hidden" id="drawControls">
+              <div class="color-picker-wrapper">
+                <div id="colorPreview" class="color-preview"></div>
+                <input type="color" id="brushColor" value="#ff2d78" class="color-input" />
+              </div>
+              <button id="eraserBtn" class="draw-tool-btn" type="button" title="Borracha">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 20H7L3 16a1 1 0 0 1 0-1.41l9.59-9.59a2 2 0 0 1 2.82 0L20 10a1 1 0 0 1 0 1.41L11.41 20"/>
+                  <path d="M6.5 17.5L3 14"/>
+                </svg>
+              </button>
+              <button id="rainbowBtn" class="draw-tool-btn" type="button" title="Pincel arco-íris">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round">
+                  <path d="M8 20a4 4 0 0 1 8 0"/>
+                  <path d="M5 20a7 7 0 0 1 14 0"/>
+                  <path d="M2 20a10 10 0 0 1 20 0"/>
+                </svg>
+              </button>
             </div>
-            <button id="clearCanvas" class="clear-btn" type="button" title="Limpar desenho">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-              </svg>
-            </button>
           </div>
           <button id="toggleDraw" class="pill-draw-btn" type="button" title="Alternar texto / desenho">
             <span id="toggleIconWrap"></span>
