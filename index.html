@@ -182,35 +182,10 @@
     <!-- ═══ COMPOSER ═══ -->
     <div class="composer-wrapper">
       <div class="composer-pill" id="composerPill">
-        <div class="avatar" id="composerAvatar"></div>
-        <input type="text" class="pill-input" id="pillInput"
-          placeholder="o que tá rolando na festa?" maxlength="300"
-          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
-        <button id="toggleDraw" class="pill-draw-btn" type="button" title="Alternar texto / desenho">
-          <span id="toggleIconWrap"></span>
-        </button>
-        <button id="submitBtn" class="pill-post-btn" type="button">
-          <span class="btn-text">postar</span>
-          <span class="btn-loading hidden">
-            <svg class="spinner" width="16" height="16" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none"
-                stroke-dasharray="60" stroke-linecap="round" />
-            </svg>
-          </span>
-        </button>
-      </div>
-
-      <div class="composer-expanded" id="composerExpandedPanel">
-        <textarea id="messageField" class="composer-textarea"
-          placeholder="continue escrevendo..." maxlength="300"></textarea>
-
-        <div id="drawSection" class="draw-section hidden">
-          <div class="canvas-container">
-            <canvas id="drawCanvas" width="600" height="800"></canvas>
-          </div>
-        </div>
-
-        <div class="composer-expanded-footer">
+        <div class="composer-top-row">
+          <textarea id="messageField" class="composer-textarea"
+            placeholder="o que tá rolando na festa?" maxlength="300"
+            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
           <div class="draw-inline-tools hidden" id="drawControls">
             <div class="color-picker-wrapper">
               <div id="colorPreview" class="color-preview"></div>
@@ -224,6 +199,27 @@
               </svg>
             </button>
           </div>
+          <button id="toggleDraw" class="pill-draw-btn" type="button" title="Alternar texto / desenho">
+            <span id="toggleIconWrap"></span>
+          </button>
+          <button id="submitBtn" class="pill-post-btn" type="button">
+            <span class="btn-text">postar</span>
+            <span class="btn-loading hidden">
+              <svg class="spinner" width="16" height="16" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none"
+                  stroke-dasharray="60" stroke-linecap="round" />
+              </svg>
+            </span>
+          </button>
+        </div>
+
+        <div id="drawSection" class="draw-section hidden">
+          <div class="canvas-container">
+            <canvas id="drawCanvas" width="600" height="800"></canvas>
+          </div>
+        </div>
+
+        <div class="composer-expanded-footer" id="composerExpandedPanel">
           <span class="char-count" id="charCountWrapper"><span id="charCount">0</span>/300</span>
         </div>
       </div>
@@ -231,17 +227,10 @@
 
     <!-- ═══ FEED TABS ═══ -->
     <nav class="feed-tabs" id="feedTabs" role="tablist">
-      <button class="feed-tab active" data-tab="all" role="tab">Tudo <span class="count" id="cnt-all"></span></button>
-      <button class="feed-tab" data-tab="texts" role="tab">Escritos <span class="count" id="cnt-texts"></span></button>
-      <button class="feed-tab" data-tab="drawings" role="tab">
-        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-          stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 19l7-7 3 3-7 7-3-3z" /><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
-        </svg>
-        Desenhos <span class="count" id="cnt-drawings"></span>
-      </button>
-      <button class="feed-tab" data-tab="top" role="tab"><span class="star">★</span> Trending</button>
-      <button class="feed-tab" data-tab="mods" role="tab">Mods <span class="count" id="cnt-mods"></span></button>
+      <button class="feed-tab active" data-tab="all" role="tab">Tudo</button>
+      <button class="feed-tab" data-tab="top" role="tab">Trending</button>
+      <button class="feed-tab" data-tab="drawings" role="tab">Desenhos</button>
+      <button class="feed-tab" data-tab="texts" role="tab">Escritos</button>
     </nav>
 
     <!-- ═══ FEED ═══ -->

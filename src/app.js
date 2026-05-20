@@ -204,7 +204,6 @@ onboardSubmit.addEventListener('click', async () => {
 function paintUserUI() {
   if (!me) return;
   setGradientBg(document.getElementById('miniAvatar'), me.gradient);
-  setGradientBg(document.getElementById('composerAvatar'), me.gradient);
 }
 
 if (!me) openOnboarding();
@@ -366,8 +365,6 @@ async function deleteUserData() {
 // COMPOSER
 // ═══════════════════════════════════════════
 const composerPill = document.getElementById('composerPill');
-const composerExpandedPanel = document.getElementById('composerExpandedPanel');
-const pillInput = document.getElementById('pillInput');
 const messageField = document.getElementById('messageField');
 const charCount = document.getElementById('charCount');
 const charCountWrapper = document.getElementById('charCountWrapper');
@@ -469,7 +466,7 @@ toggleDraw.addEventListener('click', () => {
     inputMode = 'draw';
     toggleDraw.classList.add('active');
     drawSection.classList.remove('hidden');
-    messageField.classList.add('hidden');
+    composerPill.classList.add('draw-mode');
     charCountWrapper.classList.add('hidden');
     drawControls.classList.remove('hidden');
     expandComposer();
@@ -477,9 +474,10 @@ toggleDraw.addEventListener('click', () => {
     inputMode = 'text';
     toggleDraw.classList.remove('active');
     drawSection.classList.add('hidden');
-    messageField.classList.remove('hidden');
+    composerPill.classList.remove('draw-mode');
     charCountWrapper.classList.remove('hidden');
     drawControls.classList.add('hidden');
+    messageField.focus();
   }
   updateToggleIcon();
   updateSubmitDisabled();
@@ -487,34 +485,41 @@ toggleDraw.addEventListener('click', () => {
 
 // ── Pill expand / collapse ──
 function expandComposer() {
+  if (composerPill.classList.contains('active')) return;
+  // Pin current height so CSS transition has a start value
+  messageField.style.height = messageField.offsetHeight + 'px';
   composerPill.classList.add('active');
-  composerExpandedPanel.style.display = 'block';
+  // Let the browser compute the new layout, then animate to expanded height
+  requestAnimationFrame(() => {
+    messageField.style.height = Math.max(messageField.scrollHeight, 60) + 'px';
+  });
 }
 
 function collapseComposer() {
   if (inputMode !== 'text') return;
-  if (pillInput.value.trim() || messageField.value.trim()) return;
+  if (messageField.value.trim()) return;
+  messageField.style.height = '22px';
   composerPill.classList.remove('active');
-  composerExpandedPanel.style.display = 'none';
+  // After transition, clear inline height so CSS takes over
+  setTimeout(() => {
+    if (!composerPill.classList.contains('active')) messageField.style.height = '';
+  }, 380);
 }
 
-pillInput.addEventListener('focus', expandComposer);
-
-pillInput.addEventListener('input', () => {
-  messageField.value = pillInput.value;
-  messageField.style.height = 'auto';
-  messageField.style.height = messageField.scrollHeight + 'px';
-  const len = pillInput.value.length;
-  charCount.textContent = len;
-  charCountWrapper.classList.toggle('over', len > 300);
-  updateSubmitDisabled();
+// Clicking anywhere on the pill focuses the textarea (expands it)
+composerPill.addEventListener('click', (e) => {
+  if (!e.target.closest('button')) messageField.focus();
 });
 
-// Auto-resize textarea + sync back to pill
+messageField.addEventListener('focus', expandComposer);
+
+// Auto-resize textarea on input — bypasses height transition while typing
 messageField.addEventListener('input', () => {
-  pillInput.value = messageField.value.split('\n')[0].slice(0, 60);
+  messageField.style.transition = 'none';
   messageField.style.height = 'auto';
   messageField.style.height = messageField.scrollHeight + 'px';
+  // Restore transition on next frame so open/close still animates
+  requestAnimationFrame(() => { messageField.style.transition = ''; });
   const len = messageField.value.length;
   charCount.textContent = len;
   charCountWrapper.classList.toggle('over', len > 300);
@@ -522,7 +527,7 @@ messageField.addEventListener('input', () => {
 });
 
 document.addEventListener('click', e => {
-  if (composerPill.contains(e.target) || composerExpandedPanel.contains(e.target)) return;
+  if (composerPill.contains(e.target)) return;
   collapseComposer();
 });
 
@@ -571,7 +576,6 @@ async function handleSubmit() {
     await addDoc(collection(db, POSTS), docData);
 
     messageField.value = '';
-    pillInput.value = '';
     messageField.style.height = 'auto';
     charCount.textContent = '0';
     ctx.fillStyle = '#ffffff';
@@ -787,7 +791,6 @@ function initReplySection(id, postEl) {
   section.innerHTML = `
     <div class="reply-thread" id="thread_${id}"></div>
     <div class="reply-composer">
-      <div class="avatar avatar-sm reply-avatar" style="background-image:${grad};background-size:130% 130%;background-position:center center"></div>
       <input class="reply-input" type="text" placeholder="responder..." maxlength="200" autocomplete="off" />
       <button class="reply-send" type="button" disabled>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
@@ -853,7 +856,12 @@ function renderReplyThread(id, snap) {
   thread.innerHTML = '';
   snap.forEach(d => {
     const r = d.data();
+    const replyId = d.id;
     const grad = r.gradient?.length === 2 ? gradientCSS(r.gradient) : gradientCSS(['#ff2d78', '#9b59ff']);
+    const isMine = r.authorId === me?.id;
+    const reported = (r.reportedBy || []).includes(me?.id);
+    const liked = (r.likedBy || []).includes(me?.id);
+    const likeCount = (r.likedBy || []).length;
     const item = document.createElement('div');
     item.className = 'thread-item';
     item.innerHTML = `
@@ -865,10 +873,97 @@ function renderReplyThread(id, snap) {
           <span class="reply-time">${formatTime(r.createdAt)}</span>
         </div>
         <div class="reply-content">${escapeHTML(r.message)}</div>
+        <div class="reply-actions">
+          <button class="reply-like-btn ${liked ? 'liked' : ''}" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24"
+              fill="${liked ? 'currentColor' : 'none'}"
+              stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+            ${likeCount > 0 ? `<span>${likeCount}</span>` : ''}
+          </button>
+        </div>
+      </div>
+      <div class="post-menu">
+        <button class="post-menu-btn" type="button" aria-label="mais opções">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="5" r="1.8"/>
+            <circle cx="12" cy="12" r="1.8"/>
+            <circle cx="12" cy="19" r="1.8"/>
+          </svg>
+        </button>
+        <div class="post-menu-dropdown">
+          ${isMine ? `<button class="menu-item menu-danger reply-selfdelete-btn" type="button">Apagar minha resposta</button>` : ''}
+          ${!isMine ? `<button class="menu-item reply-report-btn${reported ? ' reported' : ''}" type="button" ${reported ? 'disabled' : ''}>${reported ? 'Reportado' : 'Reportar resposta'}</button>` : ''}
+        </div>
       </div>
     `;
+
+    item.querySelector('.reply-like-btn').addEventListener('click', () => toggleReplyLike(id, replyId, r));
+
+    const menuBtn = item.querySelector('.post-menu-btn');
+    const menuEl  = item.querySelector('.post-menu');
+    menuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = menuEl.classList.contains('open');
+      document.querySelectorAll('.post-menu.open').forEach(m => m.classList.remove('open'));
+      if (!isOpen) menuEl.classList.add('open');
+    });
+
+    if (isMine) {
+      item.querySelector('.reply-selfdelete-btn')?.addEventListener('click', () => {
+        menuEl.classList.remove('open');
+        selfDeleteReply(id, replyId, item);
+      });
+    } else {
+      item.querySelector('.reply-report-btn')?.addEventListener('click', () => {
+        menuEl.classList.remove('open');
+        reportReply(id, replyId, r);
+      });
+    }
+
     thread.appendChild(item);
   });
+}
+
+async function toggleReplyLike(postId, replyId, data) {
+  if (!me) return openOnboarding();
+  const ref = doc(db, POSTS, postId, 'replies', replyId);
+  const liked = (data.likedBy || []).includes(me.id);
+  try {
+    await updateDoc(ref, { likedBy: liked ? arrayRemove(me.id) : arrayUnion(me.id) });
+  } catch (err) {
+    console.error('reply like error', err);
+  }
+}
+
+async function selfDeleteReply(postId, replyId, itemEl) {
+  if (!confirm('Apagar sua resposta permanentemente?')) return;
+  itemEl.style.opacity = '0.4';
+  itemEl.style.pointerEvents = 'none';
+  try {
+    await deleteDoc(doc(db, POSTS, postId, 'replies', replyId));
+    await updateDoc(doc(db, POSTS, postId), { replyCount: increment(-1) });
+  } catch {
+    itemEl.style.opacity = '';
+    itemEl.style.pointerEvents = '';
+    showToast('erro ao apagar resposta');
+  }
+}
+
+async function reportReply(postId, replyId, replyData) {
+  if (!me) return openOnboarding();
+  if ((replyData.reportedBy || []).includes(me.id)) {
+    showToast('você já reportou esta resposta');
+    return;
+  }
+  try {
+    await updateDoc(doc(db, POSTS, postId, 'replies', replyId), { reportedBy: arrayUnion(me.id) });
+    showToast('resposta reportada');
+  } catch {
+    showToast('erro ao reportar');
+  }
 }
 
 function updateReplyCcomposersGradient() {
