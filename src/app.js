@@ -327,7 +327,7 @@ async function downloadMyPostsAsPDF() {
         </div>
       </div>
       ${isDrawing
-        ? `<span class="drawing-label">desenho</span><img class="post-drawing" src="${post.message}" alt="desenho" />`
+        ? `<img class="post-drawing" src="${post.message}" alt="desenho" />`
         : `<div class="post-content">${escapeHTML(post.message || '').replace(/\n/g, '<br>')}</div>`
       }
       <div class="post-footer">
@@ -351,7 +351,7 @@ async function downloadMyPostsAsPDF() {
   <title>Meus posts — Hangul Hangover</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet"/>
   <style>
-    *,*::before,*::after{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;box-sizing:border-box;margin:0;padding:0}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     body{font-family:'Outfit',sans-serif;background:#1a0a2e;color:#f0e6ff;min-height:100vh}
     .page{max-width:580px;margin:0 auto;padding:36px 24px 60px}
     .brand{display:flex;align-items:center;gap:14px;margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid rgba(255,255,255,.1)}
@@ -363,9 +363,7 @@ async function downloadMyPostsAsPDF() {
     .profile-avatar{width:48px;height:48px;border-radius:50%;flex-shrink:0;border:2px solid rgba(255,255,255,.18)}
     .profile-name{font-size:1rem;font-weight:700}
     .profile-meta{font-size:.68rem;color:rgba(240,230,255,.45);margin-top:2px}
-    .lgpd{font-size:.68rem;color:rgba(240,230,255,.5);background:rgba(155,89,255,.07);border:1px solid rgba(155,89,255,.18);border-radius:8px;padding:9px 12px;margin-bottom:24px;line-height:1.55}
-    .lgpd strong{color:rgba(155,89,255,.9)}
-    .section-title{font-size:.68rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#ff2d78;margin-bottom:12px}
+
     .post-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:14px;margin-bottom:12px;break-inside:avoid;page-break-inside:avoid}
     .post-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
     .post-avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;border:1px solid rgba(255,255,255,.15)}
@@ -375,9 +373,8 @@ async function downloadMyPostsAsPDF() {
     .post-drawing{max-width:200px;border-radius:8px;display:block;border:1px solid rgba(255,255,255,.1);margin-top:4px}
     .post-footer{display:flex;gap:14px;margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)}
     .post-stat{display:flex;align-items:center;gap:4px;font-size:.7rem;color:rgba(240,230,255,.4)}
-    .drawing-label{display:inline-block;font-size:.58rem;padding:2px 7px;border-radius:20px;background:rgba(0,212,255,.1);color:#00d4ff;border:1px solid rgba(0,212,255,.2);font-weight:600;margin-bottom:6px;letter-spacing:.05em;text-transform:uppercase}
+
     .doc-footer{margin-top:40px;padding-top:16px;border-top:1px solid rgba(255,255,255,.1);font-size:.63rem;color:rgba(240,230,255,.3);display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px}
-    @media print{.page{padding:16px 20px}}
   </style>
 </head>
 <body>
@@ -393,20 +390,36 @@ async function downloadMyPostsAsPDF() {
     <div class="profile-avatar" style="background:linear-gradient(135deg,${g1} 0%,${g2} 100%)"></div>
     <div>
       <div class="profile-name">${escapeHTML(me.name)}</div>
-      <div class="profile-meta">Exportado em ${exportDate} · ${count} post${count !== 1 ? 's' : ''}</div>
+      <div class="profile-meta">${count} post${count !== 1 ? 's' : ''}</div>
     </div>
   </div>
-  <div class="lgpd">
-    Relatório gerado em conformidade com a <strong>Lei Geral de Proteção de Dados (LGPD) — Lei nº 13.709/2018, art. 18, II</strong>. Este documento contém todos os dados pessoais publicados pela sua conta na Hangul Hangover.
-  </div>
-  <div class="section-title">seus posts · ${count}</div>
   ${postsHTML}
   <div class="doc-footer">
     <span>Hangul Hangover</span>
     <span>Exportado em ${exportDate}</span>
   </div>
 </div>
-<script>window.addEventListener('load',function(){setTimeout(function(){window.print()},700)});<\/script>
+<div id="gen-status" style="position:fixed;bottom:16px;right:16px;background:rgba(26,10,46,.95);border:1px solid rgba(155,89,255,.3);color:rgba(240,230,255,.7);font-family:'Outfit',sans-serif;font-size:.72rem;padding:8px 14px;border-radius:8px;z-index:9999">Gerando PDF…</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>
+<script>window.addEventListener('load',async function(){
+  var s=document.getElementById('gen-status');
+  try{
+    s.style.display='none';
+    var canvas=await html2canvas(document.querySelector('.page'),{scale:2,useCORS:true,backgroundColor:'#1a0a2e',logging:false});
+    s.style.display='';
+    var W=canvas.width/2,H=canvas.height/2;
+    var pdf=new window.jspdf.jsPDF({orientation:'p',unit:'px',format:[W,H]});
+    pdf.addImage(canvas.toDataURL('image/png'),'PNG',0,0,W,H);
+    pdf.save('meus-posts-hangul-hangover.pdf');
+    s.textContent='PDF gerado! Esta aba pode ser fechada.';
+    setTimeout(function(){try{window.close();}catch(e){}},2000);
+  }catch(e){
+    s.style.display='';
+    s.textContent='Erro ao gerar PDF. Use Ctrl+P → Salvar como PDF.';
+    s.style.borderColor='rgba(255,45,120,.3)';s.style.color='#ff2d78';
+  }
+});<\/script>
 </body>
 </html>`;
 
@@ -1536,8 +1549,12 @@ let toastTimeout;
 function showToast(text) {
   successToast.querySelector('.toast-text').textContent = text;
   clearTimeout(toastTimeout);
+  successToast.classList.remove('hidden');
   successToast.classList.add('show');
-  toastTimeout = setTimeout(() => successToast.classList.remove('show'), 2400);
+  toastTimeout = setTimeout(() => {
+    successToast.classList.remove('show');
+    successToast.classList.add('hidden');
+  }, 2400);
 }
 
 const confirmToast = document.getElementById('confirmToast');
@@ -1545,12 +1562,15 @@ function showConfirmToast(text, onYes, onNo) {
   confirmToast.querySelector('.confirm-toast-text').textContent = text;
   confirmToast.querySelector('.confirm-yes').onclick = () => {
     confirmToast.classList.remove('show');
+    confirmToast.classList.add('hidden');
     onYes();
   };
   confirmToast.querySelector('.confirm-no').onclick = () => {
     confirmToast.classList.remove('show');
+    confirmToast.classList.add('hidden');
     if (onNo) onNo();
   };
+  confirmToast.classList.remove('hidden');
   confirmToast.classList.add('show');
 }
 
