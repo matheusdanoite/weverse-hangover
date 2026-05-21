@@ -639,6 +639,34 @@ html, body {
   margin-top: 4px;
 }
 
+/* ════════════ LAZY SCROLL SENTINEL ════════════ */
+.load-sentinel {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.load-sentinel::after {
+  content: '';
+  display: none;
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(155, 89, 255, 0.25);
+  border-top-color: var(--purple-accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.load-sentinel.loading::after {
+  display: block;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ════════════ DRAWING GALLERY ════════════ */
 .feed-gallery {
   display: grid;
