@@ -24,11 +24,8 @@ const auth = getAuth(app);
 const POSTS = 'hangul_messages';
 const USERS = 'hangul_usernames';
 
-const MODERATORS = Object.fromEntries(
-  (firebaseConfig.moderatorProfiles || []).map(p => [p.email, p])
-);
-const MOD_NAMES   = new Set(Object.values(MODERATORS).map(p => p.name));
-const ADMIN_EMAILS = Object.keys(MODERATORS);
+const MOD_NAMES = new Set((firebaseConfig.moderatorProfiles || []).map(p => p.name));
+const MOD_IDS   = new Set((firebaseConfig.moderatorProfiles || []).map(p => p.id));
 const GOOGLE_PROVIDER = new GoogleAuthProvider();
 
 // ═══════════════════════════════════════════
@@ -211,21 +208,30 @@ else paintUserUI();
 
 // ── Admin auth ──
 onAuthStateChanged(auth, async (user) => {
-  if (user && MODERATORS[user.email]) {
-    const profile = MODERATORS[user.email];
-    me = { ...profile };
-    saveUser(me);
-    onboardOverlay.classList.add('hidden');
-    paintUserUI();
-    updateReplyCcomposersGradient();
+  if (user) {
     try {
-      await setDoc(doc(db, USERS, profile.name), {
-        userId: profile.id,
-        displayName: profile.name,
-        createdAt: serverTimestamp()
+      const idToken = await user.getIdToken();
+      const res = await fetch('/api/adm/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
       });
-    } catch {}
-  } else if (!user && Object.values(MODERATORS).some(p => p.id === me?.id)) {
+      if (!res.ok) { await signOut(auth); return; }
+      const profile = await res.json();
+      me = { ...profile };
+      saveUser(me);
+      onboardOverlay.classList.add('hidden');
+      paintUserUI();
+      updateReplyCcomposersGradient();
+      try {
+        await setDoc(doc(db, USERS, profile.name), {
+          userId: profile.id,
+          displayName: profile.name,
+          createdAt: serverTimestamp()
+        });
+      } catch {}
+    } catch { await signOut(auth); }
+  } else if (!user && MOD_IDS.has(me?.id)) {
     Object.values(LS).forEach(k => localStorage.removeItem(k));
     me = null;
     location.reload();
@@ -947,7 +953,11 @@ async function _doLike(id, data, liked) {
   const ref = doc(db, POSTS, id);
   try {
     const updates = { likedBy: liked ? arrayRemove(me.id) : arrayUnion(me.id) };
-    if (!liked && data.authorId !== me.id) updates.lastLikerName = me.name;
+    if (!liked && data.authorId !== me.id) {
+      updates.lastLikerName = me.name;
+      updates.lastLikerGradient = me.gradient;
+      updates.lastLikerId = me.id;
+    }
     await updateDoc(ref, updates);
   } catch (err) {
     console.error('like error', err);
@@ -1455,9 +1465,13 @@ function renderNotifList() {
       const liker   = data.lastLikerName || 'alguém';
       const extra   = likes - 1;
       const textHTML = extra > 0
-        ? `<strong>${escapeHTML(liker)}</strong> e mais ${extra} curtiram seu post.`
+        ? `<strong>${escapeHTML(liker)}</strong> +${extra} curtiram seu post.`
         : `<strong>${escapeHTML(liker)}</strong> curtiu seu post.`;
-      items.push({ id, postDate, hasNew, icon: heartSVG, type: 'like', avatarName: liker, extra, textHTML, isDrawing, preview: postPreviewText });
+      const likerGradient = data.lastLikerGradient || null;
+      const otherLikerIds = (data.likedBy || [])
+        .filter(uid => uid !== me?.id && uid !== data.lastLikerId)
+        .slice(-3);
+      items.push({ id, postDate, hasNew, icon: heartSVG, type: 'like', avatarName: liker, extra, textHTML, isDrawing, preview: postPreviewText, likerGradient, otherLikerIds });
     }
 
     if (replies > 0) {
@@ -1496,15 +1510,21 @@ function renderNotifList() {
     return;
   }
 
-  items.forEach(({ id, hasNew, icon, type, avatarName, extra, textHTML, isDrawing, preview }) => {
+  items.forEach(({ id, hasNew, icon, type, avatarName, extra, textHTML, isDrawing, preview, likerGradient, otherLikerIds }) => {
     const wrap = document.createElement('div');
     wrap.className = `notif-item notif-type-${type}${hasNew ? ' unread' : ''}`;
 
     let avatarsHTML = '';
     if (avatarName) {
-      const grad = nameGradient(avatarName);
-      avatarsHTML = `<div class="notif-avatar" style="background-image:${grad}">${escapeHTML(avatarName.charAt(0).toUpperCase())}</div>`;
-      if (extra > 0) avatarsHTML += `<div class="notif-avatar notif-avatar-more">+${extra}</div>`;
+      if (type === 'like' && otherLikerIds?.length > 0) {
+        for (const sid of [...otherLikerIds].reverse()) {
+          const grad = nameGradient(sid);
+          avatarsHTML += `<div class="notif-avatar notif-avatar-secondary" style="background-image:${grad}"></div>`;
+        }
+      }
+      const grad = likerGradient ? gradientCSS(likerGradient) : nameGradient(avatarName);
+      avatarsHTML += `<div class="notif-avatar" style="background-image:${grad}">${escapeHTML(avatarName.charAt(0).toUpperCase())}</div>`;
+      if (type !== 'like' && extra > 0) avatarsHTML += `<div class="notif-avatar notif-avatar-more">+${extra}</div>`;
     }
 
     let previewHTML = '';
