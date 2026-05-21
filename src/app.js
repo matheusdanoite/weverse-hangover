@@ -300,45 +300,121 @@ async function downloadMyPostsAsPDF() {
 
   myPosts.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
 
+  const [g1, g2] = me.gradient?.length === 2 ? me.gradient : ['#ff2d78', '#9b59ff'];
+  const exportDate = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const count = myPosts.length;
+
   let postsHTML = '';
   for (const post of myPosts) {
     const time = post.createdAt
-      ? new Date(post.createdAt.seconds * 1000).toLocaleString('pt-BR')
+      ? new Date(post.createdAt.seconds * 1000).toLocaleString('pt-BR', {
+          day: '2-digit', month: '2-digit', year: '2-digit',
+          hour: '2-digit', minute: '2-digit',
+        })
       : '';
-    postsHTML += `<div class="post">
-      <div class="time">${time}</div>`;
-    if (post.type === 'drawing') {
-      postsHTML += `<img src="${post.message}" alt="desenho" />`;
-    } else {
-      postsHTML += `<div class="content">${escapeHTML(post.message).replace(/\n/g, '<br>')}</div>`;
-    }
-    postsHTML += `</div>`;
+    const [pg1, pg2] = post.gradient?.length === 2 ? post.gradient : [g1, g2];
+    const likes   = (post.likedBy || []).length;
+    const replies = post.replyCount || 0;
+    const isDrawing = post.type === 'drawing';
+
+    postsHTML += `
+    <div class="post-card">
+      <div class="post-header">
+        <div class="post-avatar" style="background:linear-gradient(135deg,${pg1} 0%,${pg2} 100%)"></div>
+        <div>
+          <div class="post-author">${escapeHTML(post.author || 'anônimo')}</div>
+          <div class="post-time">${time}</div>
+        </div>
+      </div>
+      ${isDrawing
+        ? `<span class="drawing-label">desenho</span><img class="post-drawing" src="${post.message}" alt="desenho" />`
+        : `<div class="post-content">${escapeHTML(post.message || '').replace(/\n/g, '<br>')}</div>`
+      }
+      <div class="post-footer">
+        <span class="post-stat">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          ${likes}
+        </span>
+        <span class="post-stat">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+          ${replies}
+        </span>
+      </div>
+    </div>`;
   }
 
-  const html = `<!DOCTYPE html><html lang="pt-BR"><head>
-<meta charset="UTF-8"/>
-<title>Meus posts — Hangul Hangover</title>
-<style>
-  body{font-family:sans-serif;padding:24px;max-width:540px;margin:0 auto;color:#111;}
-  h1{font-size:22px;margin-bottom:4px;}
-  .sub{color:#666;font-size:13px;margin-bottom:24px;}
-  .post{border:1px solid #ddd;border-radius:8px;padding:14px;margin-bottom:14px;break-inside:avoid;}
-  .time{color:#999;font-size:11px;margin-bottom:6px;}
-  .content{white-space:pre-wrap;font-size:15px;line-height:1.5;}
-  img{max-width:180px;border-radius:6px;display:block;margin-top:6px;}
-  @media print{body{padding:0;}}
-</style></head><body>
-<h1>Meus posts na Hangul Hangover</h1>
-<div class="sub">${escapeHTML(me.name)} · ${new Date().toLocaleDateString('pt-BR')}</div>
-${postsHTML}
-</body></html>`;
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Meus posts — Hangul Hangover</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Outfit',sans-serif;background:#1a0a2e;color:#f0e6ff;min-height:100vh}
+    .page{max-width:580px;margin:0 auto;padding:36px 24px 60px}
+    .brand{display:flex;align-items:center;gap:14px;margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid rgba(255,255,255,.1)}
+    .brand-logo{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#ff2d78 0%,#9b59ff 100%);flex-shrink:0}
+    .brand-w1{font-size:1.25rem;font-weight:800;letter-spacing:.1em;color:#ff2d78}
+    .brand-w2{font-size:1.25rem;font-weight:300;letter-spacing:.18em;color:#9b59ff}
+    .brand-sub{font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;color:rgba(240,230,255,.4);margin-top:3px}
+    .profile-block{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:16px;margin-bottom:10px}
+    .profile-avatar{width:48px;height:48px;border-radius:50%;flex-shrink:0;border:2px solid rgba(255,255,255,.18)}
+    .profile-name{font-size:1rem;font-weight:700}
+    .profile-meta{font-size:.68rem;color:rgba(240,230,255,.45);margin-top:2px}
+    .lgpd{font-size:.68rem;color:rgba(240,230,255,.5);background:rgba(155,89,255,.07);border:1px solid rgba(155,89,255,.18);border-radius:8px;padding:9px 12px;margin-bottom:24px;line-height:1.55}
+    .lgpd strong{color:rgba(155,89,255,.9)}
+    .section-title{font-size:.68rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#ff2d78;margin-bottom:12px}
+    .post-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:14px;margin-bottom:12px;break-inside:avoid;page-break-inside:avoid}
+    .post-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+    .post-avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;border:1px solid rgba(255,255,255,.15)}
+    .post-author{font-size:.86rem;font-weight:700}
+    .post-time{font-size:.64rem;color:rgba(240,230,255,.4);margin-top:1px}
+    .post-content{font-size:.92rem;line-height:1.5;white-space:pre-wrap;word-break:break-word;color:#e8deff}
+    .post-drawing{max-width:200px;border-radius:8px;display:block;border:1px solid rgba(255,255,255,.1);margin-top:4px}
+    .post-footer{display:flex;gap:14px;margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)}
+    .post-stat{display:flex;align-items:center;gap:4px;font-size:.7rem;color:rgba(240,230,255,.4)}
+    .drawing-label{display:inline-block;font-size:.58rem;padding:2px 7px;border-radius:20px;background:rgba(0,212,255,.1);color:#00d4ff;border:1px solid rgba(0,212,255,.2);font-weight:600;margin-bottom:6px;letter-spacing:.05em;text-transform:uppercase}
+    .doc-footer{margin-top:40px;padding-top:16px;border-top:1px solid rgba(255,255,255,.1);font-size:.63rem;color:rgba(240,230,255,.3);display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px}
+    @media print{.page{padding:16px 20px}}
+  </style>
+</head>
+<body>
+<div class="page">
+  <div class="brand">
+    <div class="brand-logo"></div>
+    <div>
+      <div><span class="brand-w1">WEVERSE </span><span class="brand-w2">HANGOVER</span></div>
+      <div class="brand-sub">relatório de dados pessoais</div>
+    </div>
+  </div>
+  <div class="profile-block">
+    <div class="profile-avatar" style="background:linear-gradient(135deg,${g1} 0%,${g2} 100%)"></div>
+    <div>
+      <div class="profile-name">${escapeHTML(me.name)}</div>
+      <div class="profile-meta">Exportado em ${exportDate} · ${count} post${count !== 1 ? 's' : ''}</div>
+    </div>
+  </div>
+  <div class="lgpd">
+    Relatório gerado em conformidade com a <strong>Lei Geral de Proteção de Dados (LGPD) — Lei nº 13.709/2018, art. 18, II</strong>. Este documento contém todos os dados pessoais publicados pela sua conta na Hangul Hangover.
+  </div>
+  <div class="section-title">seus posts · ${count}</div>
+  ${postsHTML}
+  <div class="doc-footer">
+    <span>Hangul Hangover</span>
+    <span>Exportado em ${exportDate}</span>
+  </div>
+</div>
+<script>window.addEventListener('load',function(){setTimeout(function(){window.print()},700)});<\/script>
+</body>
+</html>`;
 
-  const win = window.open('', '_blank');
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const win  = window.open(url, '_blank');
   if (!win) { showToast('permita pop-ups para baixar'); return; }
-  win.document.write(html);
-  win.document.close();
-  win.focus();
-  setTimeout(() => win.print(), 600);
+  setTimeout(() => URL.revokeObjectURL(url), 15000);
 }
 
 async function deleteUserData() {
@@ -760,6 +836,54 @@ function buildPostElement(id, data) {
   return el;
 }
 
+function buildDrawingTile(id, data) {
+  const liked = (data.likedBy || []).includes(me?.id);
+  const likeCount = (data.likedBy || []).length;
+  const el = document.createElement('div');
+  el.className = 'drawing-tile';
+  el.dataset.id = id;
+  el.innerHTML = `
+    <img class="post-drawing tile-img" src="${data.message || ''}" alt="desenho" loading="lazy" />
+    <div class="tile-overlay">
+      <button class="tile-like-btn${liked ? ' liked' : ''}" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24"
+          fill="${liked ? 'currentColor' : 'none'}"
+          stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+        </svg>
+        ${likeCount > 0 ? `<span class="tile-like-count">${likeCount}</span>` : ''}
+      </button>
+    </div>
+  `;
+  el.querySelector('.tile-like-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleLike(id, postsMap.get(id) || data);
+  });
+  seenObserver.observe(el);
+  return el;
+}
+
+function updateDrawingTile(el, data) {
+  const liked = (data.likedBy || []).includes(me?.id);
+  const likeCount = (data.likedBy || []).length;
+  const btn = el.querySelector('.tile-like-btn');
+  if (!btn) return;
+  btn.classList.toggle('liked', liked);
+  btn.querySelector('svg').setAttribute('fill', liked ? 'currentColor' : 'none');
+  let countEl = btn.querySelector('.tile-like-count');
+  if (likeCount > 0) {
+    if (!countEl) {
+      countEl = document.createElement('span');
+      countEl.className = 'tile-like-count';
+      btn.appendChild(countEl);
+    }
+    countEl.textContent = likeCount;
+  } else {
+    countEl?.remove();
+  }
+}
+
 async function selfDeletePost(id, el) {
   if (!confirm('Apagar seu post permanentemente?')) return;
   el.classList.add('deleting');
@@ -784,10 +908,7 @@ async function reportPost(id, data) {
     // Notify moderators
     fetch('/api/notify_mods', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Internal-Key': firebaseConfig.internalKey || '',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ postId: id, text: `"${(current.message || '').slice(0, 30)}..." foi denunciado.` })
     }).catch(console.error);
   } catch (err) {
@@ -801,8 +922,16 @@ function updatePostElement(el, id, data) {
 
 async function toggleLike(id, data) {
   if (!me) return openOnboarding();
-  const ref = doc(db, POSTS, id);
   const liked = (data.likedBy || []).includes(me.id);
+  if (data.authorId === me.id && !liked) {
+    showConfirmToast('Alguém te ama mais que você?', () => _doLike(id, data, liked), null);
+    return;
+  }
+  await _doLike(id, data, liked);
+}
+
+async function _doLike(id, data, liked) {
+  const ref = doc(db, POSTS, id);
   try {
     const updates = { likedBy: liked ? arrayRemove(me.id) : arrayUnion(me.id) };
     if (!liked && data.authorId !== me.id) updates.lastLikerName = me.name;
@@ -1105,6 +1234,9 @@ function renderFeed() {
     rankStrip?.remove();
   }
 
+  const isGallery = activeTab === 'drawings';
+  feed.classList.toggle('feed-gallery', isGallery);
+
   if (posts.length === 0) {
     feed.querySelectorAll('[data-id]').forEach(el => {
       seenObserver.unobserve(el);
@@ -1124,7 +1256,12 @@ function renderFeed() {
   }
 
   feed.querySelector('.tab-empty')?.remove();
-  renderInto(feed, posts);
+
+  if (isGallery) {
+    renderGallery(feed, posts);
+  } else {
+    renderInto(feed, posts);
+  }
 
   // Rank badges
   feed.querySelectorAll('.post[data-id]').forEach((el, i) => {
@@ -1138,11 +1275,37 @@ function renderFeed() {
   });
 }
 
+function renderGallery(container, list) {
+  const desiredIds = new Set(list.map(([id]) => id));
+  Array.from(container.querySelectorAll('[data-id]')).forEach(child => {
+    const id = child.dataset.id;
+    if (!desiredIds.has(id) || !child.classList.contains('drawing-tile')) {
+      seenObserver.unobserve(child);
+      replySubObserver.unobserve(child);
+      if (replySubs.has(id)) { replySubs.get(id)(); replySubs.delete(id); }
+      child.remove();
+      cardElements.delete(id);
+    }
+  });
+  list.forEach(([id, data], idx) => {
+    let existing = container.querySelector(`[data-id="${id}"].drawing-tile`);
+    if (!existing) {
+      existing = buildDrawingTile(id, data);
+      cardElements.set(id, existing);
+    } else {
+      updateDrawingTile(existing, data);
+    }
+    const postsInContainer = Array.from(container.querySelectorAll('[data-id]'));
+    const current = postsInContainer[idx];
+    if (current !== existing) container.insertBefore(existing, current || null);
+  });
+}
+
 function renderInto(container, list) {
   const desiredIds = list.map(([id]) => id);
-  // Only operate on elements that represent posts (have data-id)
   Array.from(container.querySelectorAll('[data-id]')).forEach(child => {
-    if (!desiredIds.includes(child.dataset.id)) {
+    // Remove if not in list OR if it's a gallery tile (wrong type for list mode)
+    if (!desiredIds.includes(child.dataset.id) || child.classList.contains('drawing-tile')) {
       seenObserver.unobserve(child);
       replySubObserver.unobserve(child);
       const id = child.dataset.id;
@@ -1244,57 +1407,69 @@ function closeNotifDrawer() {
   updateNotifications();
 }
 
+function nameGradient(name) {
+  const palette = ['#ff2d78','#9b59ff','#00d4ff','#ff6ba6','#ffb800','#34e89e','#fc466b','#3f5efb','#d926a9'];
+  let h = 0;
+  for (const c of (name || '?')) h = (h * 31 + c.charCodeAt(0)) & 0xffff;
+  const i = h % palette.length;
+  const j = (i + 3) % palette.length;
+  return `linear-gradient(135deg, ${palette[i]} 0%, ${palette[j]} 100%)`;
+}
+
 function renderNotifList() {
   notifList.innerHTML = '';
   const own = ownPosts();
   const items = [];
 
-  const heartSVG  = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
-  const chatSVG   = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`;
-  const alertSVG  = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`;
-  const checkSVG  = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
+  const heartSVG  = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+  const chatSVG   = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`;
+  const alertSVG  = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`;
+  const checkSVG  = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
+  const drawSVG   = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z"/><path d="M9 8c-2 3-4 3.5-7 4l8 10c2-1 6-5 6-7"/></svg>`;
 
   own.forEach(([id, data]) => {
     const base = notifBaseline[id] || { likes: 0, replies: 0, reportNotified: 0, maintainNotified: 0 };
-    const likes        = othersLikes(data);
-    const replies      = data.replyCount || 0;
-    const reportCount  = data.reportedBy?.length || 0;
+    const likes         = othersLikes(data);
+    const replies       = data.replyCount || 0;
+    const reportCount   = data.reportedBy?.length || 0;
     const maintainCount = data.maintainedCount || 0;
-    const postDate     = data.createdAt?.seconds || 0;
-
-    const postPreview = data.type === 'drawing'
-      ? '[desenho]'
-      : escapeHTML((data.message || '').slice(0, 60)) + ((data.message || '').length > 60 ? '…' : '');
+    const postDate      = data.createdAt?.seconds || 0;
+    const isDrawing     = data.type === 'drawing';
+    const postPreviewText = isDrawing ? '' : (data.message || '').slice(0, 100);
 
     if (likes > 0) {
-      const hasNew     = likes > (base.likes || 0);
-      const liker      = escapeHTML(data.lastLikerName || 'alguém');
-      const likeText   = likes === 1
-        ? `${liker} curtiu seu post.`
-        : `${liker} e outros ${likes - 1} curtiram seu post.`;
-      items.push({ id, postDate, hasNew, icon: heartSVG, type: 'like', text: likeText, context: postPreview });
+      const hasNew  = likes > (base.likes || 0);
+      const liker   = data.lastLikerName || 'alguém';
+      const extra   = likes - 1;
+      const textHTML = extra > 0
+        ? `<strong>${escapeHTML(liker)}</strong> e mais ${extra} curtiram seu post.`
+        : `<strong>${escapeHTML(liker)}</strong> curtiu seu post.`;
+      items.push({ id, postDate, hasNew, icon: heartSVG, type: 'like', avatarName: liker, extra, textHTML, isDrawing, preview: postPreviewText });
     }
 
     if (replies > 0) {
-      const hasNew      = replies > (base.replies || 0);
-      const commenter   = escapeHTML(data.lastReplyAuthor || 'alguém');
-      const replyCtx    = data.lastReplyText
-        ? escapeHTML(data.lastReplyText.slice(0, 80)) + (data.lastReplyText.length > 80 ? '…' : '')
-        : postPreview;
-      items.push({ id, postDate, hasNew, icon: chatSVG, type: 'comment', text: `${commenter} comentou no seu post.`, context: replyCtx });
+      const hasNew  = replies > (base.replies || 0);
+      const author  = data.lastReplyAuthor || 'alguém';
+      const extra   = replies - 1;
+      const textHTML = extra > 0
+        ? `<strong>${escapeHTML(author)}</strong> e mais ${extra} comentaram no seu post.`
+        : `<strong>${escapeHTML(author)}</strong> comentou no seu post.`;
+      const preview = data.lastReplyText
+        ? data.lastReplyText.slice(0, 100)
+        : postPreviewText;
+      items.push({ id, postDate, hasNew, icon: chatSVG, type: 'comment', avatarName: author, extra, textHTML, isDrawing, preview });
     }
 
     const isRemoved = reportCount >= 3 && reportCount > maintainCount;
     if (isRemoved) {
       const hasNew = reportCount > (base.reportNotified || 0);
-      items.push({ id, postDate, hasNew, icon: alertSVG, type: 'report', text: 'Seu post recebeu três denúncias e foi retirado para avaliação dos hosts.', context: postPreview });
+      items.push({ id, postDate, hasNew, icon: alertSVG, type: 'report', avatarName: null, extra: 0, textHTML: 'Seu post recebeu três denúncias e foi retirado para avaliação dos hosts.', isDrawing, preview: postPreviewText });
     }
 
     const isRestored = reportCount >= 3 && maintainCount >= reportCount && data.maintainNote;
     if (isRestored) {
-      const hasNew     = maintainCount > (base.maintainNotified || 0);
-      const noteCtx    = escapeHTML((data.maintainNote || '').slice(0, 100)) + ((data.maintainNote || '').length > 100 ? '…' : '');
-      items.push({ id, postDate, hasNew, icon: checkSVG, type: 'restore', text: 'Após análise dos moderadores, seu post voltou ao ar sob a seguinte justificativa:', context: noteCtx });
+      const hasNew = maintainCount > (base.maintainNotified || 0);
+      items.push({ id, postDate, hasNew, icon: checkSVG, type: 'restore', avatarName: null, extra: 0, textHTML: 'Após análise dos moderadores, seu post voltou ao ar.', isDrawing, preview: (data.maintainNote || '').slice(0, 100) });
     }
   });
 
@@ -1308,17 +1483,32 @@ function renderNotifList() {
     return;
   }
 
-  items.forEach(({ id, hasNew, icon, type, text, context }) => {
+  items.forEach(({ id, hasNew, icon, type, avatarName, extra, textHTML, isDrawing, preview }) => {
     const wrap = document.createElement('div');
     wrap.className = `notif-item notif-type-${type}${hasNew ? ' unread' : ''}`;
+
+    let avatarsHTML = '';
+    if (avatarName) {
+      const grad = nameGradient(avatarName);
+      avatarsHTML = `<div class="notif-avatar" style="background-image:${grad}">${escapeHTML(avatarName.charAt(0).toUpperCase())}</div>`;
+      if (extra > 0) avatarsHTML += `<div class="notif-avatar notif-avatar-more">+${extra}</div>`;
+    }
+
+    let previewHTML = '';
+    if (isDrawing) {
+      previewHTML = `<div class="notif-post-preview is-drawing">${drawSVG} desenho</div>`;
+    } else if (preview) {
+      previewHTML = `<div class="notif-post-preview">${escapeHTML(preview)}${preview.length >= 100 ? '…' : ''}</div>`;
+    }
+
     wrap.innerHTML = `
-      <div class="notif-row">
-        <div class="notif-icon">${icon}</div>
-        <div class="notif-body">
-          <div class="notif-text"><strong>${text}</strong></div>
-          ${context ? `<div class="notif-context">${context}</div>` : ''}
-        </div>
+      <div class="notif-type-chip">${icon}</div>
+      <div class="notif-content">
+        ${avatarsHTML ? `<div class="notif-avatars">${avatarsHTML}</div>` : ''}
+        <p class="notif-text">${textHTML}</p>
+        ${previewHTML}
       </div>`;
+
     wrap.addEventListener('click', () => {
       closeNotifDrawer();
       const el = document.querySelector(`.post[data-id="${id}"]`);
@@ -1348,6 +1538,20 @@ function showToast(text) {
   clearTimeout(toastTimeout);
   successToast.classList.add('show');
   toastTimeout = setTimeout(() => successToast.classList.remove('show'), 2400);
+}
+
+const confirmToast = document.getElementById('confirmToast');
+function showConfirmToast(text, onYes, onNo) {
+  confirmToast.querySelector('.confirm-toast-text').textContent = text;
+  confirmToast.querySelector('.confirm-yes').onclick = () => {
+    confirmToast.classList.remove('show');
+    onYes();
+  };
+  confirmToast.querySelector('.confirm-no').onclick = () => {
+    confirmToast.classList.remove('show');
+    if (onNo) onNo();
+  };
+  confirmToast.classList.add('show');
 }
 
 // ═══════════════════════════════════════════

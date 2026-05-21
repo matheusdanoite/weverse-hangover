@@ -647,7 +647,7 @@
         updateReports();
         renderPosts();
       } catch (e) {
-        postList.innerHTML = `<div class="state-empty"><p>erro: ${e.message}</p></div>`;
+        postList.innerHTML = `<div class="state-empty"><p>erro: ${escapeHTML(String(e.message || e))}</p></div>`;
         showToast('erro ao carregar', 'error');
       }
     }
@@ -837,7 +837,7 @@
           <span class="reply-time">${formatTimeAbs(r.createdAt)}</span>
         </div>
         <div class="reply-content">
-          ${r.type === 'drawing'
+          ${r.type === 'drawing' && typeof r.message === 'string' && /^data:image\/(png|jpeg|gif|webp);base64,/.test(r.message)
             ? `<img class="post-drawing" src="${r.message}" alt="desenho" loading="lazy" />`
             : escapeHTML(r.message || '')
           }
