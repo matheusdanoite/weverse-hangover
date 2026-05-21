@@ -790,6 +790,7 @@ function getPostsForTab(tab) {
   }
 }
 
+let _tabCountsCache = '';
 function updateTabCounts() {
   const all = [];
   for (const [, data] of postsMap.entries()) {
@@ -798,14 +799,20 @@ function updateTabCounts() {
     if (_rc >= 3 && _rc > _mc) continue;
     all.push(data);
   }
+  const texts    = all.filter(d => d.type !== 'drawing').length;
+  const drawings = all.filter(d => d.type === 'drawing').length;
+  const mods     = all.filter(d => MOD_NAMES.has(d.author)).length;
+  const key = `${all.length}|${texts}|${drawings}|${mods}`;
+  if (key === _tabCountsCache) return;
+  _tabCountsCache = key;
   const cntAll      = document.getElementById('cnt-all');
   const cntTexts    = document.getElementById('cnt-texts');
   const cntDrawings = document.getElementById('cnt-drawings');
   const cntMods     = document.getElementById('cnt-mods');
   if (cntAll)      cntAll.textContent      = all.length;
-  if (cntTexts)    cntTexts.textContent    = all.filter(d => d.type !== 'drawing').length;
-  if (cntDrawings) cntDrawings.textContent = all.filter(d => d.type === 'drawing').length;
-  if (cntMods)     cntMods.textContent     = all.filter(d => MOD_NAMES.has(d.author)).length;
+  if (cntTexts)    cntTexts.textContent    = texts;
+  if (cntDrawings) cntDrawings.textContent = drawings;
+  if (cntMods)     cntMods.textContent     = mods;
 }
 
 // ── Feed Tabs ──
@@ -832,9 +839,13 @@ feedTabs.addEventListener('click', e => {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
+let _resizeTimer;
 window.addEventListener('resize', () => {
-  const active = document.querySelector('.feed-tab.active');
-  if (active) moveIndicator(active);
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(() => {
+    const active = document.querySelector('.feed-tab.active');
+    if (active) moveIndicator(active);
+  }, 150);
 });
 
 requestAnimationFrame(() => {
@@ -844,6 +855,16 @@ requestAnimationFrame(() => {
 
 const cardElements = new Map();
 const replySubs = new Map();
+const visibleCards = new Set();
+
+const visibilityObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    const id = entry.target.dataset.id;
+    if (!id) return;
+    if (entry.isIntersecting) visibleCards.add(id);
+    else visibleCards.delete(id);
+  });
+}, { threshold: 0.01 });
 
 // IntersectionObserver: mark as "seen" after 1.5s in view
 const seenObserver = new IntersectionObserver((entries) => {
@@ -895,6 +916,7 @@ function buildPostElement(id, data) {
   });
   seenObserver.observe(el);
   replySubObserver.observe(el);
+  visibilityObserver.observe(el);
   return el;
 }
 
@@ -923,6 +945,7 @@ function buildDrawingTile(id, data) {
     toggleLike(id, postsMap.get(id) || data);
   });
   seenObserver.observe(el);
+  visibilityObserver.observe(el);
   return el;
 }
 
@@ -1315,7 +1338,9 @@ function renderFeed() {
     feed.querySelectorAll('[data-id]').forEach(el => {
       seenObserver.unobserve(el);
       replySubObserver.unobserve(el);
+      visibilityObserver.unobserve(el);
       const id = el.dataset.id;
+      visibleCards.delete(id);
       if (replySubs.has(id)) { replySubs.get(id)(); replySubs.delete(id); }
       cardElements.delete(id);
       el.remove();
@@ -1364,6 +1389,8 @@ function renderGallery(container, list) {
     if (!desiredIds.has(id) || !child.classList.contains('drawing-tile')) {
       seenObserver.unobserve(child);
       replySubObserver.unobserve(child);
+      visibilityObserver.unobserve(child);
+      visibleCards.delete(id);
       if (replySubs.has(id)) { replySubs.get(id)(); replySubs.delete(id); }
       child.remove();
       cardElements.delete(id);
@@ -1390,7 +1417,9 @@ function renderInto(container, list) {
     if (!desiredIds.includes(child.dataset.id) || child.classList.contains('drawing-tile')) {
       seenObserver.unobserve(child);
       replySubObserver.unobserve(child);
+      visibilityObserver.unobserve(child);
       const id = child.dataset.id;
+      visibleCards.delete(id);
       if (replySubs.has(id)) { replySubs.get(id)(); replySubs.delete(id); }
       child.remove();
       cardElements.delete(id);
@@ -1463,18 +1492,19 @@ const sentinelObserver = new IntersectionObserver((entries) => {
 }, { rootMargin: '400px' });
 sentinelObserver.observe(loadSentinel);
 
-// Refresh relative timestamps — only for cards visible in the viewport
 setInterval(() => {
   if (document.visibilityState === 'hidden') return;
-  const vh = window.innerHeight;
-  cardElements.forEach((el, id) => {
-    if (!el.isConnected) return;
-    const { top, bottom } = el.getBoundingClientRect();
-    if (bottom < 0 || top > vh) return;
+  visibleCards.forEach(id => {
+    const el = cardElements.get(id);
+    if (!el || !el.isConnected) {
+      visibleCards.delete(id);
+      cardElements.delete(id);
+      return;
+    }
     const data = postsMap.get(id);
     if (data) updatePostCard(el, data, me);
   });
-}, 30000);
+}, 60000);
 
 // ═══════════════════════════════════════════
 // NOTIFICATIONS
