@@ -639,6 +639,65 @@ html, body {
   margin-top: 4px;
 }
 
+/* ════════════ DRAWING GALLERY ════════════ */
+.feed-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  align-items: start;
+}
+
+.feed-gallery .tab-empty { grid-column: 1 / -1; }
+
+.drawing-tile {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.drawing-tile .tile-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.tile-overlay {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  pointer-events: none;
+}
+
+.tile-like-btn {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(10, 0, 25, 0.72);
+  border: none;
+  border-radius: 20px;
+  padding: 4px 8px 4px 6px;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: background 0.15s;
+  line-height: 1;
+}
+
+.tile-like-btn:hover { background: rgba(30, 5, 50, 0.88); }
+.tile-like-btn.liked { color: var(--pink-neon); }
+
+.tile-like-count {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
 .empty-feed {
   text-align: center;
   padding: 40px 20px;
@@ -1069,62 +1128,115 @@ html, body {
 .notif-list {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
 }
 
 .notif-item {
-  background: var(--surface-1);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 12px;
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
   cursor: pointer;
   transition: background 0.15s;
+  border-bottom: 1px solid var(--border-subtle);
+  position: relative;
 }
 
-.notif-item:hover { background: var(--surface-2); }
+.notif-item:hover { background: var(--surface-hover); }
 
-.notif-item.unread { border-color: rgba(255, 45, 120, 0.4); background: rgba(255, 45, 120, 0.08); }
-.notif-item.notif-type-report.unread { border-color: rgba(255, 152, 0, 0.4); background: rgba(255, 152, 0, 0.07); }
-.notif-item.notif-type-restore.unread { border-color: rgba(76, 175, 80, 0.4); background: rgba(76, 175, 80, 0.07); }
-
-.notif-row {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
+.notif-item.unread::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--pink-neon);
+  border-radius: 0 2px 2px 0;
 }
+.notif-item.notif-type-report.unread::before  { background: #ff9800; }
+.notif-item.notif-type-restore.unread::before { background: #4caf50; }
 
-.notif-icon {
+.notif-type-chip {
   flex-shrink: 0;
-  margin-top: 2px;
+  width: 36px;
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 2px;
 }
 
-.notif-type-like .notif-icon svg    { color: var(--pink-light); }
-.notif-type-comment .notif-icon svg { color: var(--blue-electric); }
-.notif-type-report .notif-icon svg  { color: #ff9800; }
-.notif-type-restore .notif-icon svg { color: #4caf50; }
+.notif-type-like    .notif-type-chip { color: var(--pink-neon); }
+.notif-type-comment .notif-type-chip { color: var(--blue-electric); }
+.notif-type-report  .notif-type-chip { color: #ff9800; }
+.notif-type-restore .notif-type-chip { color: #4caf50; }
 
-.notif-body {
+.notif-content {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 7px;
+  min-width: 0;
+}
+
+.notif-avatars {
+  display: flex;
+  align-items: center;
+}
+
+.notif-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid rgba(20, 8, 38, 0.97);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.9);
+  margin-right: -8px;
+  background-size: 130% 130%;
+  background-position: center;
+}
+
+.notif-avatar:last-child { margin-right: 0; }
+
+.notif-avatar-more {
+  background: var(--surface-2) !important;
+  background-image: none !important;
+  color: var(--text-muted) !important;
+  font-size: 0.62rem;
+  border-color: var(--border-strong) !important;
 }
 
 .notif-text {
-  font-size: 0.88rem;
-  line-height: 1.4;
-  color: var(--text-primary);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  margin: 0;
 }
 
-.notif-context {
+.notif-text strong { color: var(--text-primary); font-weight: 700; }
+
+.notif-post-preview {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
   font-size: 0.78rem;
   color: var(--text-muted);
+  line-height: 1.45;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.notif-post-preview.is-drawing {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
   font-style: italic;
-  border-left: 2px solid var(--border-subtle);
-  padding-left: 8px;
 }
 
 .notif-empty {
@@ -1161,6 +1273,44 @@ html, body {
 
 .toast-icon { font-size: 1.1rem; color: var(--pink-neon); }
 .toast-text { font-size: 0.85rem; font-weight: 600; letter-spacing: 0.5px; }
+
+.confirm-toast {
+  flex-direction: column;
+  gap: 10px;
+  text-align: center;
+  white-space: normal;
+  max-width: 280px;
+  pointer-events: none;
+}
+.confirm-toast.show { pointer-events: auto; }
+
+.confirm-toast-text {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.confirm-toast-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.confirm-btn {
+  padding: 5px 20px;
+  border-radius: 20px;
+  border: 1.5px solid var(--pink-neon);
+  background: transparent;
+  color: var(--pink-neon);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  transition: background 0.15s, color 0.15s;
+}
+.confirm-btn:hover { background: var(--pink-neon); color: #fff; }
+.confirm-btn.confirm-yes { background: var(--pink-neon); color: #fff; }
+.confirm-btn.confirm-yes:hover { background: transparent; color: var(--pink-neon); }
 
 /* ════════════ MOBILE OPTIMIZATIONS ════════════ */
 @media (max-width: 600px) {

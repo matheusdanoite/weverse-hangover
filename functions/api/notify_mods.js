@@ -1,11 +1,6 @@
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  const internalKey = env.INTERNAL_KEY;
-  if (internalKey && request.headers.get('X-Internal-Key') !== internalKey) {
-    return new Response('Forbidden', { status: 403 });
-  }
-
   try {
     const { postId, text } = await request.json();
     if (!postId || !/^[a-zA-Z0-9]{10,30}$/.test(postId)) {
@@ -23,8 +18,21 @@ export async function onRequestPost(context) {
 
     const token = await getGoogleAuthToken(serviceAccount.client_email, serviceAccount.private_key);
 
-    // 2. Fetch mod tokens from Firestore (REST API)
     const projectId = serviceAccount.project_id;
+
+    // 2. Verify that the post exists and has at least one report in Firestore
+    const postUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/hangul_messages/${postId}`;
+    const postRes = await fetch(postUrl, { headers: { Authorization: `Bearer ${token}` } });
+    if (!postRes.ok) {
+      return new Response(JSON.stringify({ success: false, reason: 'Post not found' }), { status: 200 });
+    }
+    const postDoc = await postRes.json();
+    const reportedBy = postDoc.fields?.reportedBy?.arrayValue?.values;
+    if (!reportedBy || reportedBy.length === 0) {
+      return new Response(JSON.stringify({ success: false, reason: 'No reports on post' }), { status: 200 });
+    }
+
+    // 3. Fetch mod tokens from Firestore (REST API)
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/hangul_fcm_tokens`;
     
     const fsResponse = await fetch(firestoreUrl, {
@@ -46,7 +54,7 @@ export async function onRequestPost(context) {
       return new Response(JSON.stringify({ success: true, reason: "No mods found" }), { status: 200 });
     }
 
-    // 3. Send Push Notifications via FCM HTTP v1
+    // 4. Send Push Notifications via FCM HTTP v1
     const fcmUrl = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
     
     const promises = tokens.map(targetToken => {

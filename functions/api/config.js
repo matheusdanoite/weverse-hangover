@@ -11,7 +11,6 @@ export function onRequest(context) {
       messagingSenderId:  env.FIREBASE_MESSAGING_SENDER_ID,
       appId:              env.FIREBASE_APP_ID,
       moderatorProfiles,
-      internalKey:        env.INTERNAL_KEY || '',
     }),
     {
       headers: {
