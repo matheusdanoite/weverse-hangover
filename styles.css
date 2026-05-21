@@ -672,7 +672,7 @@ html, body {
 /* ════════════ DRAWING GALLERY ════════════ */
 .feed-gallery {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 3px;
   align-items: start;
 }
@@ -683,7 +683,7 @@ html, body {
   position: relative;
   aspect-ratio: 3 / 4;
   overflow: hidden;
-  border-radius: 4px;
+  border-radius: 2px;
   background: var(--surface);
   cursor: pointer;
 }
