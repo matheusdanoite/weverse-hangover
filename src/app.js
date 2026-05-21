@@ -457,7 +457,15 @@ async function downloadMyPostsAsPDF() {
     const W = canvas.width / 2, H = canvas.height / 2;
     const pdf = new window.jspdf.jsPDF({ orientation: 'p', unit: 'px', format: [W, H] });
     pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, W, H);
-    pdf.save('meus-posts-hangul-hangover.pdf');
+    const blob = pdf.output('blob');
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'meus-posts-hangul-hangover.pdf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
     showToast('PDF baixado!');
   } catch {
     showToast('erro ao gerar PDF. use Ctrl+P → Salvar como PDF');
