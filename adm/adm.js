@@ -132,22 +132,43 @@ onAuthStateChanged(auth, async (user) => {
     adminShell.classList.add('hidden');
     return;
   }
+  let idToken;
+  try { idToken = await user.getIdToken(); }
+  catch {
+    loadingScreen.classList.add('hidden');
+    loginScreen.classList.remove('hidden');
+    showToast('erro ao obter token. tente novamente', 'error');
+    return;
+  }
+  let res;
   try {
-    const idToken = await user.getIdToken();
-    const res = await fetch('/api/adm/verify', {
+    res = await fetch('/api/adm/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ idToken }),
     });
-    if (!res.ok) throw new Error('unauthorized');
-    modProfile = await res.json();
   } catch {
+    // Network failure — keep session alive, let user retry
+    loadingScreen.classList.add('hidden');
+    loginScreen.classList.remove('hidden');
+    showToast('sem conexão. tente novamente', 'error');
+    return;
+  }
+  if (res.status === 401 || res.status === 403) {
     await signOut(auth);
     showToast('acesso negado', 'error');
     loadingScreen.classList.add('hidden');
     loginScreen.classList.remove('hidden');
     return;
   }
+  if (!res.ok) {
+    // Server error — don't sign out, let user retry
+    loadingScreen.classList.add('hidden');
+    loginScreen.classList.remove('hidden');
+    showToast('erro no servidor. tente novamente', 'error');
+    return;
+  }
+  modProfile = await res.json();
   loginScreen.classList.add('hidden');
   loadingScreen.classList.add('hidden');
   adminShell.classList.remove('hidden');

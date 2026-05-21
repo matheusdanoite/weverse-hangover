@@ -8,7 +8,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js';
 import {
   getFirestore, collection, collectionGroup, addDoc, doc, updateDoc, serverTimestamp,
-  query, orderBy, limit, onSnapshot, arrayUnion, arrayRemove, increment,
+  query, orderBy, limit, startAfter, onSnapshot, arrayUnion, arrayRemove, increment,
   where, getDocs, deleteDoc, getDoc, setDoc
 } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js';
 import {
@@ -33,6 +33,7 @@ const GOOGLE_PROVIDER = new GoogleAuthProvider();
 // ═══════════════════════════════════════════
 const LS = {
   USER: 'hangul.user',
+  PREV_USER: 'hangul.prevUser',
   SEEN: 'hangul.seenPosts',
   BASE: 'hangul.notifsBase',
 };
@@ -209,30 +210,53 @@ else paintUserUI();
 // ── Admin auth ──
 onAuthStateChanged(auth, async (user) => {
   if (user) {
+    let idToken;
+    try { idToken = await user.getIdToken(); }
+    catch { await signOut(auth); return; }
+
+    let res;
     try {
-      const idToken = await user.getIdToken();
-      const res = await fetch('/api/adm/verify', {
+      res = await fetch('/api/adm/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken }),
       });
-      if (!res.ok) { await signOut(auth); return; }
-      const profile = await res.json();
-      me = { ...profile };
-      saveUser(me);
-      onboardOverlay.classList.add('hidden');
-      paintUserUI();
-      updateReplyCcomposersGradient();
-      try {
-        await setDoc(doc(db, USERS, profile.name), {
-          userId: profile.id,
-          displayName: profile.name,
-          createdAt: serverTimestamp()
-        });
-      } catch {}
-    } catch { await signOut(auth); }
+    } catch {
+      // Network failure — don't sign out, silently ignore on feed page
+      return;
+    }
+
+    if (res.status === 401 || res.status === 403) { await signOut(auth); return; }
+    if (!res.ok) return;
+
+    const profile = await res.json();
+    // Preserve regular user profile before overwriting with admin identity
+    if (me && !MOD_IDS.has(me.id)) {
+      localStorage.setItem(LS.PREV_USER, localStorage.getItem(LS.USER));
+    }
+    me = { ...profile };
+    saveUser(me);
+    onboardOverlay.classList.add('hidden');
+    paintUserUI();
+    updateReplyCcomposersGradient();
+    try {
+      await setDoc(doc(db, USERS, profile.name), {
+        userId: profile.id,
+        displayName: profile.name,
+        createdAt: serverTimestamp()
+      });
+    } catch {}
   } else if (!user && MOD_IDS.has(me?.id)) {
-    Object.values(LS).forEach(k => localStorage.removeItem(k));
+    // Restore previous regular user profile if one was saved before admin login
+    const prevUser = localStorage.getItem(LS.PREV_USER);
+    localStorage.removeItem(LS.USER);
+    localStorage.removeItem(LS.PREV_USER);
+    if (prevUser) {
+      localStorage.setItem(LS.USER, prevUser);
+    } else {
+      localStorage.removeItem(LS.SEEN);
+      localStorage.removeItem(LS.BASE);
+    }
     me = null;
     location.reload();
   }
@@ -349,91 +373,109 @@ async function downloadMyPostsAsPDF() {
     </div>`;
   }
 
-  const html = `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Meus posts — Hangul Hangover</title>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet"/>
-  <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Outfit',sans-serif;background:#1a0a2e;color:#f0e6ff;min-height:100vh}
-    .page{max-width:580px;margin:0 auto;padding:36px 24px 60px}
-    .brand{display:flex;align-items:center;gap:14px;margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid rgba(255,255,255,.1)}
-    .brand-logo{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#ff2d78 0%,#9b59ff 100%);flex-shrink:0}
-    .brand-w1{font-size:1.25rem;font-weight:800;letter-spacing:.1em;color:#ff2d78}
-    .brand-w2{font-size:1.25rem;font-weight:300;letter-spacing:.18em;color:#9b59ff}
-    .brand-sub{font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;color:rgba(240,230,255,.4);margin-top:3px}
-    .profile-block{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:16px;margin-bottom:10px}
-    .profile-avatar{width:48px;height:48px;border-radius:50%;flex-shrink:0;border:2px solid rgba(255,255,255,.18)}
-    .profile-name{font-size:1rem;font-weight:700}
-    .profile-meta{font-size:.68rem;color:rgba(240,230,255,.45);margin-top:2px}
+  showToast('gerando PDF…');
 
-    .post-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:14px;margin-bottom:12px;break-inside:avoid;page-break-inside:avoid}
-    .post-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-    .post-avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;border:1px solid rgba(255,255,255,.15)}
-    .post-author{font-size:.86rem;font-weight:700}
-    .post-time{font-size:.64rem;color:rgba(240,230,255,.4);margin-top:1px}
-    .post-content{font-size:.92rem;line-height:1.5;white-space:pre-wrap;word-break:break-word;color:#e8deff}
-    .post-drawing{max-width:200px;border-radius:8px;display:block;border:1px solid rgba(255,255,255,.1);margin-top:4px}
-    .post-footer{display:flex;gap:14px;margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)}
-    .post-stat{display:flex;align-items:center;gap:4px;font-size:.7rem;color:rgba(240,230,255,.4)}
-
-    .doc-footer{margin-top:40px;padding-top:16px;border-top:1px solid rgba(255,255,255,.1);font-size:.63rem;color:rgba(240,230,255,.3);display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px}
-  </style>
-</head>
-<body>
-<div class="page">
-  <div class="brand">
-    <div class="brand-logo"></div>
-    <div>
-      <div><span class="brand-w1">WEVERSE </span><span class="brand-w2">HANGOVER</span></div>
-      <div class="brand-sub">relatório de dados pessoais</div>
-    </div>
-  </div>
-  <div class="profile-block">
-    <div class="profile-avatar" style="background:linear-gradient(135deg,${g1} 0%,${g2} 100%)"></div>
-    <div>
-      <div class="profile-name">${escapeHTML(me.name)}</div>
-      <div class="profile-meta">${count} post${count !== 1 ? 's' : ''}</div>
-    </div>
-  </div>
-  ${postsHTML}
-  <div class="doc-footer">
-    <span>Hangul Hangover</span>
-    <span>Exportado em ${exportDate}</span>
-  </div>
-</div>
-<div id="gen-status" style="position:fixed;bottom:16px;right:16px;background:rgba(26,10,46,.95);border:1px solid rgba(155,89,255,.3);color:rgba(240,230,255,.7);font-family:'Outfit',sans-serif;font-size:.72rem;padding:8px 14px;border-radius:8px;z-index:9999">Gerando PDF…</div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>
-<script>window.addEventListener('load',async function(){
-  var s=document.getElementById('gen-status');
-  try{
-    s.style.display='none';
-    var canvas=await html2canvas(document.querySelector('.page'),{scale:2,useCORS:true,backgroundColor:'#1a0a2e',logging:false});
-    s.style.display='';
-    var W=canvas.width/2,H=canvas.height/2;
-    var pdf=new window.jspdf.jsPDF({orientation:'p',unit:'px',format:[W,H]});
-    pdf.addImage(canvas.toDataURL('image/png'),'PNG',0,0,W,H);
-    pdf.save('meus-posts-hangul-hangover.pdf');
-    s.textContent='PDF gerado! Esta aba pode ser fechada.';
-    setTimeout(function(){try{window.close();}catch(e){}},2000);
-  }catch(e){
-    s.style.display='';
-    s.textContent='Erro ao gerar PDF. Use Ctrl+P → Salvar como PDF.';
-    s.style.borderColor='rgba(255,45,120,.3)';s.style.color='#ff2d78';
+  try {
+    await Promise.all([
+      loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'),
+      loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'),
+    ]);
+  } catch {
+    showToast('erro ao carregar bibliotecas. tente novamente');
+    return;
   }
-});<\/script>
-</body>
-</html>`;
 
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-  const url  = URL.createObjectURL(blob);
-  const win  = window.open(url, '_blank');
-  if (!win) { showToast('permita pop-ups para baixar'); return; }
-  setTimeout(() => URL.revokeObjectURL(url), 15000);
+  const styleEl = document.createElement('style');
+  styleEl.textContent = `
+    #pdf-export-container{position:absolute;top:0;left:-9999px;width:580px;background:#1a0a2e;font-family:'Outfit',sans-serif;color:#f0e6ff}
+    #pdf-export-container *,#pdf-export-container *::before,#pdf-export-container *::after{box-sizing:border-box;margin:0;padding:0}
+    #pdf-export-container .xpage{padding:36px 24px 60px}
+    #pdf-export-container .xbrand{display:flex;align-items:center;gap:14px;margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid rgba(255,255,255,.1)}
+    #pdf-export-container .xbrand-logo{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#ff2d78 0%,#9b59ff 100%);flex-shrink:0}
+    #pdf-export-container .xbrand-w1{font-size:1.25rem;font-weight:800;letter-spacing:.1em;color:#ff2d78}
+    #pdf-export-container .xbrand-w2{font-size:1.25rem;font-weight:300;letter-spacing:.18em;color:#9b59ff}
+    #pdf-export-container .xbrand-sub{font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;color:rgba(240,230,255,.4);margin-top:3px}
+    #pdf-export-container .xprofile-block{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:16px;margin-bottom:10px}
+    #pdf-export-container .xprofile-avatar{width:48px;height:48px;border-radius:50%;flex-shrink:0;border:2px solid rgba(255,255,255,.18)}
+    #pdf-export-container .xprofile-name{font-size:1rem;font-weight:700}
+    #pdf-export-container .xprofile-meta{font-size:.68rem;color:rgba(240,230,255,.45);margin-top:2px}
+    #pdf-export-container .xpost-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:14px;margin-bottom:12px}
+    #pdf-export-container .xpost-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+    #pdf-export-container .xpost-avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;border:1px solid rgba(255,255,255,.15)}
+    #pdf-export-container .xpost-author{font-size:.86rem;font-weight:700}
+    #pdf-export-container .xpost-time{font-size:.64rem;color:rgba(240,230,255,.4);margin-top:1px}
+    #pdf-export-container .xpost-content{font-size:.92rem;line-height:1.5;white-space:pre-wrap;word-break:break-word;color:#e8deff}
+    #pdf-export-container .xpost-drawing{max-width:200px;border-radius:8px;display:block;border:1px solid rgba(255,255,255,.1);margin-top:4px}
+    #pdf-export-container .xpost-footer{display:flex;gap:14px;margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)}
+    #pdf-export-container .xpost-stat{display:flex;align-items:center;gap:4px;font-size:.7rem;color:rgba(240,230,255,.4)}
+    #pdf-export-container .xdoc-footer{margin-top:40px;padding-top:16px;border-top:1px solid rgba(255,255,255,.1);font-size:.63rem;color:rgba(240,230,255,.3);display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px}
+  `;
+  document.head.appendChild(styleEl);
+
+  const postsHTMLScoped = postsHTML
+    .replace(/class="post-card"/g,   'class="xpost-card"')
+    .replace(/class="post-header"/g, 'class="xpost-header"')
+    .replace(/class="post-avatar"/g, 'class="xpost-avatar"')
+    .replace(/class="post-author"/g, 'class="xpost-author"')
+    .replace(/class="post-time"/g,   'class="xpost-time"')
+    .replace(/class="post-content"/g,'class="xpost-content"')
+    .replace(/class="post-drawing"/g,'class="xpost-drawing"')
+    .replace(/class="post-footer"/g, 'class="xpost-footer"')
+    .replace(/class="post-stat"/g,   'class="xpost-stat"');
+
+  const container = document.createElement('div');
+  container.id = 'pdf-export-container';
+  container.innerHTML = `
+    <div class="xpage">
+      <div class="xbrand">
+        <div class="xbrand-logo"></div>
+        <div>
+          <div><span class="xbrand-w1">WEVERSE </span><span class="xbrand-w2">HANGOVER</span></div>
+          <div class="xbrand-sub">relatório de dados pessoais</div>
+        </div>
+      </div>
+      <div class="xprofile-block">
+        <div class="xprofile-avatar" style="background:linear-gradient(135deg,${g1} 0%,${g2} 100%)"></div>
+        <div>
+          <div class="xprofile-name">${escapeHTML(me.name)}</div>
+          <div class="xprofile-meta">${count} post${count !== 1 ? 's' : ''}</div>
+        </div>
+      </div>
+      ${postsHTMLScoped}
+      <div class="xdoc-footer">
+        <span>Hangul Hangover</span>
+        <span>Exportado em ${exportDate}</span>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(container);
+
+  try {
+    const canvas = await html2canvas(container.querySelector('.xpage'), {
+      scale: 2, useCORS: true, backgroundColor: '#1a0a2e', logging: false,
+    });
+    const W = canvas.width / 2, H = canvas.height / 2;
+    const pdf = new window.jspdf.jsPDF({ orientation: 'p', unit: 'px', format: [W, H] });
+    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, W, H);
+    pdf.save('meus-posts-hangul-hangover.pdf');
+    showToast('PDF baixado!');
+  } catch {
+    showToast('erro ao gerar PDF. use Ctrl+P → Salvar como PDF');
+  } finally {
+    container.remove();
+    styleEl.remove();
+  }
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error(`Failed to load ${src}`));
+    document.head.appendChild(s);
+  });
 }
 
 async function deleteUserData() {
@@ -783,6 +825,7 @@ feedTabs.addEventListener('click', e => {
   document.querySelectorAll('.feed-tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
   activeTab = btn.dataset.tab;
+  renderedCount = PAGE_SIZE;
   moveIndicator(btn);
   btn.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
   renderFeed();
@@ -1166,11 +1209,17 @@ function updateReplyCcomposersGradient() {
 // ═══════════════════════════════════════════
 // MAIN POSTS LISTENER (with pending buffer)
 // ═══════════════════════════════════════════
+const PAGE_SIZE = 20;
+let renderedCount = PAGE_SIZE;
+let lastVisible = null;
+let hasMoreInFirestore = true;
+let isFetchingMore = false;
+
 const postsMap = new Map();
 const pendingNewPosts = new Map();
 let initialLoadDone = false;
 
-const postsQ = query(collection(db, POSTS), orderBy('createdAt', 'desc'), limit(150));
+const postsQ = query(collection(db, POSTS), orderBy('createdAt', 'desc'), limit(50));
 
 onSnapshot(postsQ, (snapshot) => {
   if (snapshot.empty) {
@@ -1182,6 +1231,7 @@ onSnapshot(postsQ, (snapshot) => {
 
   if (!initialLoadDone) {
     snapshot.forEach(d => postsMap.set(d.id, d.data()));
+    lastVisible = snapshot.docs[snapshot.docs.length - 1] ?? null;
     initialLoadDone = true;
     renderFeed();
     updateNotifications();
@@ -1241,7 +1291,8 @@ updateFeedBtn.addEventListener('click', () => {
 });
 
 function renderFeed() {
-  const posts = getPostsForTab(activeTab);
+  const allPosts = getPostsForTab(activeTab);
+  const posts = allPosts.slice(0, renderedCount);
   updateTabCounts();
 
   // Rank strip (only for Trending)
@@ -1260,7 +1311,7 @@ function renderFeed() {
   const isGallery = activeTab === 'drawings';
   feed.classList.toggle('feed-gallery', isGallery);
 
-  if (posts.length === 0) {
+  if (allPosts.length === 0) {
     feed.querySelectorAll('[data-id]').forEach(el => {
       seenObserver.unobserve(el);
       replySubObserver.unobserve(el);
@@ -1275,6 +1326,7 @@ function renderFeed() {
       empty.innerHTML = '<span class="icon">✦</span><p>nada por aqui ainda.</p>';
       feed.appendChild(empty);
     }
+    loadSentinel.remove();
     return;
   }
 
@@ -1296,6 +1348,13 @@ function renderFeed() {
       el.removeAttribute('data-rank');
     }
   });
+
+  // Sentinel: show when there are more posts to reveal or fetch
+  if (renderedCount < allPosts.length || hasMoreInFirestore) {
+    if (!loadSentinel.isConnected) feed.after(loadSentinel);
+  } else {
+    loadSentinel.remove();
+  }
 }
 
 function renderGallery(container, list) {
@@ -1351,6 +1410,58 @@ function renderInto(container, list) {
     if (current !== existing) container.insertBefore(existing, current || null);
   });
 }
+
+// ═══════════════════════════════════════════
+// LAZY SCROLL
+// ═══════════════════════════════════════════
+const loadSentinel = document.createElement('div');
+loadSentinel.className = 'load-sentinel';
+
+async function loadMorePosts() {
+  if (isFetchingMore || !hasMoreInFirestore || !lastVisible) return;
+  isFetchingMore = true;
+  loadSentinel.classList.add('loading');
+  try {
+    const moreQ = query(
+      collection(db, POSTS), orderBy('createdAt', 'desc'),
+      startAfter(lastVisible), limit(30)
+    );
+    const snap = await getDocs(moreQ);
+    if (snap.empty || snap.docs.length < 30) hasMoreInFirestore = false;
+    if (!snap.empty) {
+      snap.forEach(d => { if (!postsMap.has(d.id)) postsMap.set(d.id, d.data()); });
+      lastVisible = snap.docs[snap.docs.length - 1];
+      renderedCount += PAGE_SIZE;
+    }
+    renderFeed();
+  } catch {
+    // silently ignore — user can scroll again to retry
+  } finally {
+    isFetchingMore = false;
+    loadSentinel.classList.remove('loading');
+    // If sentinel is still near the viewport after the load, continue rendering
+    if (loadSentinel.isConnected) {
+      const { top } = loadSentinel.getBoundingClientRect();
+      if (top < window.innerHeight + 400) {
+        const all = getPostsForTab(activeTab);
+        if (renderedCount < all.length) { renderedCount += PAGE_SIZE; renderFeed(); }
+        else if (hasMoreInFirestore) loadMorePosts();
+      }
+    }
+  }
+}
+
+const sentinelObserver = new IntersectionObserver((entries) => {
+  if (!entries[0].isIntersecting) return;
+  const all = getPostsForTab(activeTab);
+  if (renderedCount < all.length) {
+    renderedCount += PAGE_SIZE;
+    renderFeed();
+  } else if (hasMoreInFirestore) {
+    loadMorePosts();
+  }
+}, { rootMargin: '400px' });
+sentinelObserver.observe(loadSentinel);
 
 // Refresh relative timestamps — only for cards visible in the viewport
 setInterval(() => {
