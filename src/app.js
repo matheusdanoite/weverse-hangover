@@ -804,7 +804,9 @@ async function toggleLike(id, data) {
   const ref = doc(db, POSTS, id);
   const liked = (data.likedBy || []).includes(me.id);
   try {
-    await updateDoc(ref, { likedBy: liked ? arrayRemove(me.id) : arrayUnion(me.id) });
+    const updates = { likedBy: liked ? arrayRemove(me.id) : arrayUnion(me.id) };
+    if (!liked && data.authorId !== me.id) updates.lastLikerName = me.name;
+    await updateDoc(ref, updates);
   } catch (err) {
     console.error('like error', err);
   }
@@ -859,7 +861,11 @@ function initReplySection(id, postEl) {
         gradient: me.gradient,
         createdAt: serverTimestamp()
       });
-      await updateDoc(doc(db, POSTS, id), { replyCount: increment(1) });
+      await updateDoc(doc(db, POSTS, id), {
+        replyCount: increment(1),
+        lastReplyAuthor: me.name,
+        lastReplyText: txt.slice(0, 100)
+      });
       input.value = '';
     } catch (err) {
       console.error('reply error', err);
@@ -1199,10 +1205,15 @@ function updateNotifications() {
   if (!me) { notifBadge.classList.add('hidden'); return; }
   let unread = 0;
   ownPosts().forEach(([id, data]) => {
-    const base = notifBaseline[id] || { likes: 0, replies: 0 };
+    const base = notifBaseline[id] || { likes: 0, replies: 0, reportNotified: 0, maintainNotified: 0 };
     const likes = othersLikes(data);
     const replies = data.replyCount || 0;
-    if (likes > base.likes || replies > base.replies) unread++;
+    const reportCount = data.reportedBy?.length || 0;
+    const maintainCount = data.maintainedCount || 0;
+    if (likes > (base.likes || 0)) unread++;
+    if (replies > (base.replies || 0)) unread++;
+    if (reportCount >= 3 && reportCount > maintainCount && reportCount > (base.reportNotified || 0)) unread++;
+    if (maintainCount > 0 && data.maintainNote && maintainCount >= reportCount && reportCount >= 3 && maintainCount > (base.maintainNotified || 0)) unread++;
   });
   if (unread > 0) {
     notifBadge.textContent = unread;
@@ -1224,7 +1235,9 @@ function closeNotifDrawer() {
   ownPosts().forEach(([id, data]) => {
     notifBaseline[id] = {
       likes: othersLikes(data),
-      replies: data.replyCount || 0
+      replies: data.replyCount || 0,
+      reportNotified: data.reportedBy?.length || 0,
+      maintainNotified: data.maintainedCount || 0
     };
   });
   saveBaseline(notifBaseline);
@@ -1235,19 +1248,59 @@ function renderNotifList() {
   notifList.innerHTML = '';
   const own = ownPosts();
   const items = [];
+
+  const heartSVG  = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+  const chatSVG   = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`;
+  const alertSVG  = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`;
+  const checkSVG  = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
+
   own.forEach(([id, data]) => {
-    const base = notifBaseline[id] || { likes: 0, replies: 0 };
-    const likes = othersLikes(data);
-    const replies = data.replyCount || 0;
-    const dLikes = likes - base.likes;
-    const dReplies = replies - base.replies;
-    const hasNew = dLikes > 0 || dReplies > 0;
-    if (!likes && !replies) return;
-    items.push({ id, data, likes, replies, dLikes, dReplies, hasNew });
+    const base = notifBaseline[id] || { likes: 0, replies: 0, reportNotified: 0, maintainNotified: 0 };
+    const likes        = othersLikes(data);
+    const replies      = data.replyCount || 0;
+    const reportCount  = data.reportedBy?.length || 0;
+    const maintainCount = data.maintainedCount || 0;
+    const postDate     = data.createdAt?.seconds || 0;
+
+    const postPreview = data.type === 'drawing'
+      ? '[desenho]'
+      : escapeHTML((data.message || '').slice(0, 60)) + ((data.message || '').length > 60 ? '…' : '');
+
+    if (likes > 0) {
+      const hasNew     = likes > (base.likes || 0);
+      const liker      = escapeHTML(data.lastLikerName || 'alguém');
+      const likeText   = likes === 1
+        ? `${liker} curtiu seu post.`
+        : `${liker} e outros ${likes - 1} curtiram seu post.`;
+      items.push({ id, postDate, hasNew, icon: heartSVG, type: 'like', text: likeText, context: postPreview });
+    }
+
+    if (replies > 0) {
+      const hasNew      = replies > (base.replies || 0);
+      const commenter   = escapeHTML(data.lastReplyAuthor || 'alguém');
+      const replyCtx    = data.lastReplyText
+        ? escapeHTML(data.lastReplyText.slice(0, 80)) + (data.lastReplyText.length > 80 ? '…' : '')
+        : postPreview;
+      items.push({ id, postDate, hasNew, icon: chatSVG, type: 'comment', text: `${commenter} comentou no seu post.`, context: replyCtx });
+    }
+
+    const isRemoved = reportCount >= 3 && reportCount > maintainCount;
+    if (isRemoved) {
+      const hasNew = reportCount > (base.reportNotified || 0);
+      items.push({ id, postDate, hasNew, icon: alertSVG, type: 'report', text: 'Seu post recebeu três denúncias e foi retirado para avaliação dos hosts.', context: postPreview });
+    }
+
+    const isRestored = reportCount >= 3 && maintainCount >= reportCount && data.maintainNote;
+    if (isRestored) {
+      const hasNew     = maintainCount > (base.maintainNotified || 0);
+      const noteCtx    = escapeHTML((data.maintainNote || '').slice(0, 100)) + ((data.maintainNote || '').length > 100 ? '…' : '');
+      items.push({ id, postDate, hasNew, icon: checkSVG, type: 'restore', text: 'Após análise dos moderadores, seu post voltou ao ar sob a seguinte justificativa:', context: noteCtx });
+    }
   });
+
   items.sort((a, b) => {
     if (a.hasNew !== b.hasNew) return a.hasNew ? -1 : 1;
-    return (b.data.createdAt?.seconds || 0) - (a.data.createdAt?.seconds || 0);
+    return b.postDate - a.postDate;
   });
 
   if (items.length === 0) {
@@ -1255,23 +1308,17 @@ function renderNotifList() {
     return;
   }
 
-  items.forEach(({ id, data, likes, replies, dLikes, dReplies, hasNew }) => {
-    const preview = data.type === 'drawing'
-      ? '[desenho]'
-      : (data.message || '').slice(0, 60) + ((data.message || '').length > 60 ? '…' : '');
+  items.forEach(({ id, hasNew, icon, type, text, context }) => {
     const wrap = document.createElement('div');
-    wrap.className = 'notif-item' + (hasNew ? ' unread' : '');
-    let lines = '';
-    const heartFilled = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
-    const heartEmpty = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
-    const chatIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`;
-
-    if (dLikes > 0) lines += `<div class="notif-line">${heartFilled} +${dLikes} ${dLikes === 1 ? 'curtida nova' : 'curtidas novas'} (total ${likes})</div>`;
-    else if (likes > 0) lines += `<div class="notif-line" style="color:var(--text-secondary)">${heartEmpty} ${likes} ${likes === 1 ? 'curtida' : 'curtidas'}</div>`;
-    if (dReplies > 0) lines += `<div class="notif-line">${chatIcon} +${dReplies} ${dReplies === 1 ? 'resposta nova' : 'respostas novas'} (total ${replies})</div>`;
-    else if (replies > 0) lines += `<div class="notif-line" style="color:var(--text-secondary)">${chatIcon} ${replies} ${replies === 1 ? 'resposta' : 'respostas'}</div>`;
-
-    wrap.innerHTML = `${lines}<div class="notif-context">"${escapeHTML(preview)}"</div>`;
+    wrap.className = `notif-item notif-type-${type}${hasNew ? ' unread' : ''}`;
+    wrap.innerHTML = `
+      <div class="notif-row">
+        <div class="notif-icon">${icon}</div>
+        <div class="notif-body">
+          <div class="notif-text"><strong>${text}</strong></div>
+          ${context ? `<div class="notif-context">${context}</div>` : ''}
+        </div>
+      </div>`;
     wrap.addEventListener('click', () => {
       closeNotifDrawer();
       const el = document.querySelector(`.post[data-id="${id}"]`);
