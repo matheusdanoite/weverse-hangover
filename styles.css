@@ -740,8 +740,7 @@ html, body {
 .feed-gallery {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-  padding: 8px;
+  gap: 1px;
   align-items: start;
 }
 
@@ -751,7 +750,7 @@ html, body {
   position: relative;
   aspect-ratio: 3 / 4;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 0;
   background: #fff;
   cursor: pointer;
 }
