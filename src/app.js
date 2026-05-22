@@ -13,7 +13,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js';
 import {
   gradientCSS, setGradientBg, escapeHTML,
-  formatTime, buildPostCard, updatePostCard,
+  formatTime, buildPostCard, updatePostCard, openLightbox,
 } from './shared.js';
 
 // ── Firebase + moderator profiles (fetched from server — emails never in client JS) ──
@@ -1741,6 +1741,87 @@ function showConfirmToast(text, onYes, onNo) {
   };
   confirmToast.classList.remove('hidden');
   confirmToast.classList.add('show');
+}
+
+// ═══════════════════════════════════════════
+// DRAWING LIGHTBOX
+// ═══════════════════════════════════════════
+document.addEventListener('click', e => {
+  const img = e.target.closest('.post-drawing');
+  if (!img || !img.src) return;
+  const postEl = img.closest('[data-id]');
+  const postId = postEl?.dataset.id;
+  let _lbUnsub = null;
+  openLightbox(img.src, {
+    onOpen: (threadEl, composerEl) => {
+      if (!postId) return;
+      const q = query(collection(db, POSTS, postId, 'replies'), orderBy('createdAt', 'asc'), limit(50));
+      _lbUnsub = onSnapshot(q, snap => renderLightboxThread(threadEl, snap));
+      wireLightboxComposer(composerEl, postId);
+    },
+    onClose: () => { _lbUnsub?.(); _lbUnsub = null; },
+  });
+});
+
+function renderLightboxThread(threadEl, snap) {
+  threadEl.innerHTML = '';
+  if (snap.empty) {
+    threadEl.innerHTML = '<div class="lightbox-empty">nenhum comentário ainda.</div>';
+    return;
+  }
+  snap.forEach(d => {
+    const r = d.data();
+    const grad = r.gradient?.length === 2 ? gradientCSS(r.gradient) : gradientCSS(['#ff2d78', '#9b59ff']);
+    const item = document.createElement('div');
+    item.className = 'thread-item';
+    item.innerHTML = `
+      <div class="avatar avatar-sm" style="background-image:${grad};background-size:130% 130%;background-position:center center"></div>
+      <div class="reply-body">
+        <div class="reply-header">
+          <span class="reply-author">${escapeHTML(r.author || 'anônimo')}</span>
+          ${MOD_NAMES.has(r.author) ? '<span class="mod-star mod-star-sm">★</span>' : ''}
+          <span class="reply-time">${formatTime(r.createdAt)}</span>
+        </div>
+        <div class="reply-content">${escapeHTML(r.message)}</div>
+      </div>
+    `;
+    threadEl.appendChild(item);
+  });
+}
+
+function wireLightboxComposer(composerEl, postId) {
+  if (!me) return;
+  composerEl.classList.remove('hidden');
+  const input   = composerEl.querySelector('.lightbox-reply-input');
+  const sendBtn = composerEl.querySelector('.lightbox-reply-send');
+  input.addEventListener('input', () => {
+    sendBtn.disabled = input.value.trim().length === 0;
+  });
+  const submit = async () => {
+    const txt = input.value.trim();
+    if (!txt) return;
+    sendBtn.disabled = true;
+    try {
+      await addDoc(collection(db, POSTS, postId, 'replies'), {
+        message: txt, author: me.name, authorId: me.id,
+        gradient: me.gradient, createdAt: serverTimestamp(),
+      });
+      await updateDoc(doc(db, POSTS, postId), {
+        replyCount: increment(1),
+        lastReplyAuthor: me.name,
+        lastReplyText: txt.slice(0, 100),
+      });
+      input.value = '';
+    } catch (err) {
+      console.error('lightbox reply error', err);
+    } finally {
+      sendBtn.disabled = true;
+    }
+  };
+  sendBtn.addEventListener('click', submit);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
+  });
 }
 
 // ═══════════════════════════════════════════
