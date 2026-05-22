@@ -4,7 +4,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js';
 import {
   getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, setDoc,
-  serverTimestamp, query, orderBy, getDocs, limit, increment
+  serverTimestamp, query, orderBy, onSnapshot, limit, increment, getDocs, where
 } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js';
 import { getMessaging, getToken } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-messaging.js';
 import {
@@ -16,6 +16,7 @@ const firebaseConfig = await fetch('/api/config').then(r => r.json());
 const MOD_NAMES = new Set((firebaseConfig.moderatorProfiles || []).map(p => p.name));
 
 const POSTS = 'hangul_messages';
+const BANS  = 'hangul_bans';
 
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -55,11 +56,12 @@ const maintainNoteInput  = document.getElementById('maintainNoteInput');
 const maintainCancel     = document.getElementById('maintainCancel');
 const maintainOk         = document.getElementById('maintainOk');
 
-let allPosts        = [];
-let modProfile      = null;
-let pendingConfirm  = null;
-let pendingMaintain = null;
-let toastTimer      = null;
+let allPosts          = [];
+let modProfile        = null;
+let pendingConfirm    = null;
+let pendingMaintain   = null;
+let toastTimer        = null;
+let unsubscribePosts  = null;
 
 // ── Toast ──
 function showToast(text, type = '') {
@@ -247,7 +249,6 @@ composeBtn.addEventListener('click', async () => {
     composeText.style.height = 'auto';
     composeCount.textContent = '0/300';
     showToast('postado!', 'success');
-    await loadPosts();
   } catch (e) {
     showToast('erro ao postar: ' + e.message, 'error');
   } finally {
@@ -269,22 +270,27 @@ searchToggleBtn.addEventListener('click', () => {
 });
 
 // ── Load posts ──
-async function loadPosts() {
+function loadPosts() {
+  if (unsubscribePosts) unsubscribePosts();
+
   postList.innerHTML = `<div class="state-loading">
     <svg class="spinner" width="26" height="26" viewBox="0 0 24 24">
       <circle cx="12" cy="12" r="10" stroke="rgba(255,45,120,0.3)" stroke-width="3" fill="none"/>
       <path d="M12 2a10 10 0 0 1 10 10" stroke="#ff2d78" stroke-width="3" fill="none" stroke-linecap="round"/>
     </svg></div>`;
-  try {
-    const q    = query(collection(db, POSTS), orderBy('createdAt', 'desc'), limit(120));
-    const snap = await getDocs(q);
-    allPosts   = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
-    updateReports();
-    renderPosts();
-  } catch (e) {
-    postList.innerHTML = `<div class="state-empty"><p>erro: ${escapeHTML(String(e.message || e))}</p></div>`;
-    showToast('erro ao carregar', 'error');
-  }
+
+  const q = query(collection(db, POSTS), orderBy('createdAt', 'desc'), limit(120));
+  unsubscribePosts = onSnapshot(q,
+    (snap) => {
+      allPosts = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
+      updateReports();
+      renderPosts();
+    },
+    (e) => {
+      postList.innerHTML = `<div class="state-empty"><p>erro: ${escapeHTML(String(e.message || e))}</p></div>`;
+      showToast('erro ao carregar', 'error');
+    }
+  );
 }
 
 // ── Reports ──
@@ -329,6 +335,7 @@ function buildReportItem(post) {
     modNames: MOD_NAMES,
     formatTimeFn: formatTimeAbs,
   });
+  addBanHandlers(card, post);
   wrap.appendChild(card);
 
   // Action bar
@@ -412,13 +419,15 @@ function renderPosts() {
 }
 
 function buildAdminPostCard(post) {
-  return buildPostCard(post.docId, post, {
+  const card = buildPostCard(post.docId, post, {
     me: modProfile,
     modNames: MOD_NAMES,
     formatTimeFn: formatTimeAbs,
     onDelete: (id, el) => confirmDelete(post, el),
     onReplyClick: (el) => toggleRepliesSection(post, el),
   });
+  addBanHandlers(card, post);
+  return card;
 }
 
 // ── Replies section (on-demand toggle) ──
@@ -559,6 +568,37 @@ function buildReplyComposer(postId, threadEl, post) {
   input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
 
   return wrap;
+}
+
+// ── Ban user ──
+async function banUser(authorId, authorName) {
+  try {
+    await setDoc(doc(db, BANS, authorId), {
+      bannedAt: serverTimestamp(),
+      bannedBy: modProfile.name,
+      bannedName: authorName,
+    });
+    const snap = await getDocs(query(collection(db, POSTS), where('authorId', '==', authorId)));
+    await Promise.all(snap.docs.map(d => deleteDoc(doc(db, POSTS, d.id))));
+    showToast(`@${authorName} banido. ${snap.size} post${snap.size !== 1 ? 's' : ''} deletado${snap.size !== 1 ? 's' : ''}.`, 'success');
+  } catch (e) {
+    showToast('erro ao banir: ' + e.message, 'error');
+  }
+}
+
+function addBanHandlers(card, post) {
+  if (MOD_NAMES.has(post.author) || !post.authorId) return;
+  card.querySelectorAll('.avatar-md, .post-author').forEach(el => {
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openConfirm(
+        `Banir @${post.author || 'anônimo'}?`,
+        `O dispositivo será banido permanentemente e todos os posts deletados.`,
+        () => banUser(post.authorId, post.author || 'anônimo')
+      );
+    });
+  });
 }
 
 // ── Delete post ──
