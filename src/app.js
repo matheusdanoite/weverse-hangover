@@ -55,9 +55,13 @@ function loadSeen() {
   try { return new Set(JSON.parse(localStorage.getItem(LS.SEEN)) || []); }
   catch { return new Set(); }
 }
+let _saveSeenTimer = null;
 function saveSeen(set) {
-  const arr = Array.from(set).slice(-500);
-  localStorage.setItem(LS.SEEN, JSON.stringify(arr));
+  clearTimeout(_saveSeenTimer);
+  _saveSeenTimer = setTimeout(() => {
+    const arr = Array.from(set).slice(-500);
+    localStorage.setItem(LS.SEEN, JSON.stringify(arr));
+  }, 3000);
 }
 
 function loadBaseline() {
@@ -537,9 +541,14 @@ async function deleteUserData() {
     const postsQ = query(collection(db, POSTS), where('authorId', '==', me.id));
     const repliesQ = query(collectionGroup(db, 'replies'), where('authorId', '==', me.id));
     const [postsSnap, repliesSnap] = await Promise.all([getDocs(postsQ), getDocs(repliesQ)]);
+    const mentionsQ = query(collection(db, MENTIONS), where('fromId', '==', me.id));
+    const mentionsToQ = query(collection(db, MENTIONS), where('toUserId', '==', me.id));
+    const [mentionsSnap, mentionsToSnap] = await Promise.all([getDocs(mentionsQ), getDocs(mentionsToQ)]);
     await Promise.all([
       ...postsSnap.docs.map(d => deleteDoc(d.ref)),
       ...repliesSnap.docs.map(d => deleteDoc(d.ref)),
+      ...mentionsSnap.docs.map(d => deleteDoc(d.ref)),
+      ...mentionsToSnap.docs.map(d => deleteDoc(d.ref)),
     ]);
     try { await deleteDoc(doc(db, USERS, me.name.toLowerCase())); } catch {}
     Object.values(LS).forEach(k => localStorage.removeItem(k));
@@ -1077,10 +1086,13 @@ async function reportPost(id, data) {
     await updateDoc(doc(db, POSTS, id), { reportedBy: arrayUnion(me.id) });
     showToast('post reportado');
     // Notify moderators
+    const notifText = current.type === 'drawing'
+      ? '[desenho] foi denunciado.'
+      : `"${(current.message || '').slice(0, 30)}..." foi denunciado.`;
     fetch('/api/notify_mods', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ postId: id, text: `"${(current.message || '').slice(0, 30)}..." foi denunciado.` })
+      body: JSON.stringify({ postId: id, text: notifText })
     }).catch(console.error);
   } catch (err) {
     showToast('erro ao reportar');
@@ -1199,7 +1211,7 @@ async function writeMentions(txt, postId, context = 'reply') {
   if (!me || !txt) return;
   const names = [...new Set(
     [...txt.matchAll(/@([a-zA-Z0-9._]{1,40})/g)].map(m => m[1])
-  )].filter(n => n.toLowerCase() !== me.name.toLowerCase());
+  )].filter(n => n.toLowerCase() !== me.name.toLowerCase()).slice(0, 5);
   if (!names.length) return;
   for (const mentionedName of names) {
     try {
@@ -1676,10 +1688,10 @@ function renderGallery(container, list) {
 }
 
 function renderInto(container, list) {
-  const desiredIds = list.map(([id]) => id);
+  const desiredIds = new Set(list.map(([id]) => id));
   Array.from(container.querySelectorAll('[data-id]')).forEach(child => {
     // Remove if not in list OR if it's a gallery tile (wrong type for list mode)
-    if (!desiredIds.includes(child.dataset.id) || child.classList.contains('drawing-tile')) {
+    if (!desiredIds.has(child.dataset.id) || child.classList.contains('drawing-tile')) {
       seenObserver.unobserve(child);
       replySubObserver.unobserve(child);
       visibilityObserver.unobserve(child);

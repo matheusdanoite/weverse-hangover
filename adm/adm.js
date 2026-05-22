@@ -569,11 +569,13 @@ function buildReplyComposer(postId, threadEl, post) {
       await updateDoc(doc(db, POSTS, postId), { replyCount: increment(1) });
       threadEl.querySelector('.replies-empty')?.remove();
       const fakeTs = { toDate: () => new Date() };
-      threadEl.appendChild(buildReplyItem('_local_' + Date.now(), {
+      const fakeItem = buildReplyItem('_local_' + Date.now(), {
         type: 'text', message: txt,
         author: modProfile.name, gradient: modProfile.gradient,
         createdAt: fakeTs,
-      }, postId));
+      }, postId);
+      fakeItem.querySelector('.reply-delete')?.remove();
+      threadEl.appendChild(fakeItem);
       const localPost = allPosts.find(p => p.docId === postId);
       if (localPost) localPost.replyCount = (localPost.replyCount || 0) + 1;
       post.replyCount = (post.replyCount || 0) + 1;
