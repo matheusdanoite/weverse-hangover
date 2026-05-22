@@ -841,6 +841,7 @@ async function handleSubmit() {
 // ═══════════════════════════════════════════
 const feed = document.getElementById('feed');
 const emptyFeed = document.getElementById('emptyFeed');
+const feedLoading = document.getElementById('feedLoading');
 
 let activeTab = 'all';
 
@@ -1406,6 +1407,8 @@ const postsQ = query(collection(db, POSTS), orderBy('createdAt', 'desc'), limit(
 
 onSnapshot(postsQ, (snapshot) => {
   if (snapshot.empty) {
+    feedLoading.classList.add('hidden');
+    feed.classList.remove('hidden');
     feed.innerHTML = '';
     emptyFeed.classList.remove('hidden');
     return;
@@ -1416,6 +1419,8 @@ onSnapshot(postsQ, (snapshot) => {
     snapshot.forEach(d => postsMap.set(d.id, d.data()));
     lastVisible = snapshot.docs[snapshot.docs.length - 1] ?? null;
     initialLoadDone = true;
+    feedLoading.classList.add('hidden');
+    feed.classList.remove('hidden');
     renderFeed();
     updateNotifications();
     return;

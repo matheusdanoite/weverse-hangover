@@ -798,6 +798,14 @@ html, body {
   letter-spacing: 0.3px;
 }
 
+.feed-loading {
+  display: flex;
+  justify-content: center;
+  padding: 60px 20px;
+}
+
+.feed-loading.hidden { display: none; }
+
 .empty-feed {
   text-align: center;
   padding: 40px 20px;
