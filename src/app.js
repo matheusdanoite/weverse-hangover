@@ -13,7 +13,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js';
 import {
   gradientCSS, setGradientBg, escapeHTML,
-  formatTime, buildPostCard, updatePostCard,
+  formatTime, buildPostCard, updatePostCard, openLightbox,
 } from './shared.js';
 
 // ── Firebase + moderator profiles (fetched from server — emails never in client JS) ──
@@ -457,7 +457,15 @@ async function downloadMyPostsAsPDF() {
     const W = canvas.width / 2, H = canvas.height / 2;
     const pdf = new window.jspdf.jsPDF({ orientation: 'p', unit: 'px', format: [W, H] });
     pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, W, H);
-    pdf.save('meus-posts-hangul-hangover.pdf');
+    const blob = pdf.output('blob');
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'meus-posts-hangul-hangover.pdf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
     showToast('PDF baixado!');
   } catch {
     showToast('erro ao gerar PDF. use Ctrl+P → Salvar como PDF');
@@ -790,6 +798,7 @@ function getPostsForTab(tab) {
   }
 }
 
+let _tabCountsCache = '';
 function updateTabCounts() {
   const all = [];
   for (const [, data] of postsMap.entries()) {
@@ -798,14 +807,20 @@ function updateTabCounts() {
     if (_rc >= 3 && _rc > _mc) continue;
     all.push(data);
   }
+  const texts    = all.filter(d => d.type !== 'drawing').length;
+  const drawings = all.filter(d => d.type === 'drawing').length;
+  const mods     = all.filter(d => MOD_NAMES.has(d.author)).length;
+  const key = `${all.length}|${texts}|${drawings}|${mods}`;
+  if (key === _tabCountsCache) return;
+  _tabCountsCache = key;
   const cntAll      = document.getElementById('cnt-all');
   const cntTexts    = document.getElementById('cnt-texts');
   const cntDrawings = document.getElementById('cnt-drawings');
   const cntMods     = document.getElementById('cnt-mods');
   if (cntAll)      cntAll.textContent      = all.length;
-  if (cntTexts)    cntTexts.textContent    = all.filter(d => d.type !== 'drawing').length;
-  if (cntDrawings) cntDrawings.textContent = all.filter(d => d.type === 'drawing').length;
-  if (cntMods)     cntMods.textContent     = all.filter(d => MOD_NAMES.has(d.author)).length;
+  if (cntTexts)    cntTexts.textContent    = texts;
+  if (cntDrawings) cntDrawings.textContent = drawings;
+  if (cntMods)     cntMods.textContent     = mods;
 }
 
 // ── Feed Tabs ──
@@ -832,9 +847,13 @@ feedTabs.addEventListener('click', e => {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
+let _resizeTimer;
 window.addEventListener('resize', () => {
-  const active = document.querySelector('.feed-tab.active');
-  if (active) moveIndicator(active);
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(() => {
+    const active = document.querySelector('.feed-tab.active');
+    if (active) moveIndicator(active);
+  }, 150);
 });
 
 requestAnimationFrame(() => {
@@ -844,6 +863,16 @@ requestAnimationFrame(() => {
 
 const cardElements = new Map();
 const replySubs = new Map();
+const visibleCards = new Set();
+
+const visibilityObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    const id = entry.target.dataset.id;
+    if (!id) return;
+    if (entry.isIntersecting) visibleCards.add(id);
+    else visibleCards.delete(id);
+  });
+}, { threshold: 0.01 });
 
 // IntersectionObserver: mark as "seen" after 1.5s in view
 const seenObserver = new IntersectionObserver((entries) => {
@@ -895,6 +924,7 @@ function buildPostElement(id, data) {
   });
   seenObserver.observe(el);
   replySubObserver.observe(el);
+  visibilityObserver.observe(el);
   return el;
 }
 
@@ -923,6 +953,7 @@ function buildDrawingTile(id, data) {
     toggleLike(id, postsMap.get(id) || data);
   });
   seenObserver.observe(el);
+  visibilityObserver.observe(el);
   return el;
 }
 
@@ -1315,7 +1346,9 @@ function renderFeed() {
     feed.querySelectorAll('[data-id]').forEach(el => {
       seenObserver.unobserve(el);
       replySubObserver.unobserve(el);
+      visibilityObserver.unobserve(el);
       const id = el.dataset.id;
+      visibleCards.delete(id);
       if (replySubs.has(id)) { replySubs.get(id)(); replySubs.delete(id); }
       cardElements.delete(id);
       el.remove();
@@ -1364,6 +1397,8 @@ function renderGallery(container, list) {
     if (!desiredIds.has(id) || !child.classList.contains('drawing-tile')) {
       seenObserver.unobserve(child);
       replySubObserver.unobserve(child);
+      visibilityObserver.unobserve(child);
+      visibleCards.delete(id);
       if (replySubs.has(id)) { replySubs.get(id)(); replySubs.delete(id); }
       child.remove();
       cardElements.delete(id);
@@ -1390,7 +1425,9 @@ function renderInto(container, list) {
     if (!desiredIds.includes(child.dataset.id) || child.classList.contains('drawing-tile')) {
       seenObserver.unobserve(child);
       replySubObserver.unobserve(child);
+      visibilityObserver.unobserve(child);
       const id = child.dataset.id;
+      visibleCards.delete(id);
       if (replySubs.has(id)) { replySubs.get(id)(); replySubs.delete(id); }
       child.remove();
       cardElements.delete(id);
@@ -1463,18 +1500,19 @@ const sentinelObserver = new IntersectionObserver((entries) => {
 }, { rootMargin: '400px' });
 sentinelObserver.observe(loadSentinel);
 
-// Refresh relative timestamps — only for cards visible in the viewport
 setInterval(() => {
   if (document.visibilityState === 'hidden') return;
-  const vh = window.innerHeight;
-  cardElements.forEach((el, id) => {
-    if (!el.isConnected) return;
-    const { top, bottom } = el.getBoundingClientRect();
-    if (bottom < 0 || top > vh) return;
+  visibleCards.forEach(id => {
+    const el = cardElements.get(id);
+    if (!el || !el.isConnected) {
+      visibleCards.delete(id);
+      cardElements.delete(id);
+      return;
+    }
     const data = postsMap.get(id);
     if (data) updatePostCard(el, data, me);
   });
-}, 30000);
+}, 60000);
 
 // ═══════════════════════════════════════════
 // NOTIFICATIONS
@@ -1703,6 +1741,87 @@ function showConfirmToast(text, onYes, onNo) {
   };
   confirmToast.classList.remove('hidden');
   confirmToast.classList.add('show');
+}
+
+// ═══════════════════════════════════════════
+// DRAWING LIGHTBOX
+// ═══════════════════════════════════════════
+document.addEventListener('click', e => {
+  const img = e.target.closest('.post-drawing');
+  if (!img || !img.src) return;
+  const postEl = img.closest('[data-id]');
+  const postId = postEl?.dataset.id;
+  let _lbUnsub = null;
+  openLightbox(img.src, {
+    onOpen: (threadEl, composerEl) => {
+      if (!postId) return;
+      const q = query(collection(db, POSTS, postId, 'replies'), orderBy('createdAt', 'asc'), limit(50));
+      _lbUnsub = onSnapshot(q, snap => renderLightboxThread(threadEl, snap));
+      wireLightboxComposer(composerEl, postId);
+    },
+    onClose: () => { _lbUnsub?.(); _lbUnsub = null; },
+  });
+});
+
+function renderLightboxThread(threadEl, snap) {
+  threadEl.innerHTML = '';
+  if (snap.empty) {
+    threadEl.innerHTML = '<div class="lightbox-empty">nenhum comentário ainda.</div>';
+    return;
+  }
+  snap.forEach(d => {
+    const r = d.data();
+    const grad = r.gradient?.length === 2 ? gradientCSS(r.gradient) : gradientCSS(['#ff2d78', '#9b59ff']);
+    const item = document.createElement('div');
+    item.className = 'thread-item';
+    item.innerHTML = `
+      <div class="avatar avatar-sm" style="background-image:${grad};background-size:130% 130%;background-position:center center"></div>
+      <div class="reply-body">
+        <div class="reply-header">
+          <span class="reply-author">${escapeHTML(r.author || 'anônimo')}</span>
+          ${MOD_NAMES.has(r.author) ? '<span class="mod-star mod-star-sm">★</span>' : ''}
+          <span class="reply-time">${formatTime(r.createdAt)}</span>
+        </div>
+        <div class="reply-content">${escapeHTML(r.message)}</div>
+      </div>
+    `;
+    threadEl.appendChild(item);
+  });
+}
+
+function wireLightboxComposer(composerEl, postId) {
+  if (!me) return;
+  composerEl.classList.remove('hidden');
+  const input   = composerEl.querySelector('.lightbox-reply-input');
+  const sendBtn = composerEl.querySelector('.lightbox-reply-send');
+  input.addEventListener('input', () => {
+    sendBtn.disabled = input.value.trim().length === 0;
+  });
+  const submit = async () => {
+    const txt = input.value.trim();
+    if (!txt) return;
+    sendBtn.disabled = true;
+    try {
+      await addDoc(collection(db, POSTS, postId, 'replies'), {
+        message: txt, author: me.name, authorId: me.id,
+        gradient: me.gradient, createdAt: serverTimestamp(),
+      });
+      await updateDoc(doc(db, POSTS, postId), {
+        replyCount: increment(1),
+        lastReplyAuthor: me.name,
+        lastReplyText: txt.slice(0, 100),
+      });
+      input.value = '';
+    } catch (err) {
+      console.error('lightbox reply error', err);
+    } finally {
+      sendBtn.disabled = true;
+    }
+  };
+  sendBtn.addEventListener('click', submit);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
+  });
 }
 
 // ═══════════════════════════════════════════

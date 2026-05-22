@@ -52,8 +52,8 @@ html, body {
   top: 0;
   z-index: 50;
   background: rgba(26, 10, 46, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-subtle);
   padding-top: env(safe-area-inset-top);
 }
@@ -471,8 +471,8 @@ html, body {
   display: flex;
   gap: 0;
   background: linear-gradient(to bottom, rgba(26, 10, 46, 0.95), rgba(26, 10, 46, 0.88));
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   margin: 0 -12px;
   padding: 4px 12px 0;
   border-bottom: 1px solid var(--border-subtle);
@@ -528,6 +528,7 @@ html, body {
 
 .feed-tab[data-tab="top"] .star {
   animation: starPulse 2.5s ease-in-out infinite;
+  will-change: transform;
 }
 
 @keyframes starPulse {
@@ -538,14 +539,15 @@ html, body {
 .feed-tabs::after {
   content: '';
   position: absolute;
-  left: var(--ind-x, 12px);
+  left: 0;
   bottom: 0;
   width: var(--ind-w, 40px);
   height: 2.5px;
   background: linear-gradient(90deg, var(--pink-neon), var(--purple-accent));
   border-radius: 2px 2px 0 0;
   box-shadow: 0 0 12px rgba(255, 45, 120, 0.5);
-  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateX(var(--ind-x, 12px));
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ════════════ RANK BADGE (aba Trending) ════════════ */
@@ -670,7 +672,7 @@ html, body {
 /* ════════════ DRAWING GALLERY ════════════ */
 .feed-gallery {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 3px;
   align-items: start;
 }
@@ -681,7 +683,7 @@ html, body {
   position: relative;
   aspect-ratio: 3 / 4;
   overflow: hidden;
-  border-radius: 4px;
+  border-radius: 2px;
   background: var(--surface);
   cursor: pointer;
 }
@@ -1298,8 +1300,8 @@ html, body {
   bottom: 40px;
   border-color: var(--pink-neon);
   padding: 12px 24px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 0 30px rgba(255, 45, 120, 0.4);
   transform: translateX(-50%) translateY(20px);
   transition: opacity 0.3s, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
