@@ -22,6 +22,7 @@ function getLightbox() {
       <div class="lightbox-img-wrap">
         <img class="lightbox-img" src="" alt="desenho" />
       </div>
+      <div class="lightbox-caption hidden"></div>
       <div class="lightbox-replies-area"></div>
     </div>
   `;
@@ -37,14 +38,22 @@ function getLightbox() {
   return ov;
 }
 
-export function openLightbox(src, { onOpen, onClose } = {}) {
+export function openLightbox(src, { onOpen, onClose, caption } = {}) {
   const lb = getLightbox();
   lb.querySelector('.lightbox-img').src = src;
+  const captionEl = lb.querySelector('.lightbox-caption');
+  if (caption) {
+    captionEl.textContent = caption;
+    captionEl.classList.remove('hidden');
+  } else {
+    captionEl.textContent = '';
+    captionEl.classList.add('hidden');
+  }
   const repliesArea = lb.querySelector('.lightbox-replies-area');
   repliesArea.innerHTML = `
     <div class="lightbox-thread"></div>
     <div class="lightbox-composer hidden">
-      <input class="lightbox-reply-input" type="text" placeholder="responder..." maxlength="200" autocomplete="off" />
+      <input class="lightbox-reply-input" type="text" placeholder="responder..." maxlength="200" autocomplete="off" autocorrect="on" autocapitalize="sentences" />
       <button class="lightbox-reply-send reply-send" type="button" disabled>${_SEND_SVG}</button>
     </div>
   `;
@@ -138,7 +147,7 @@ export function buildPostCard(id, data, opts = {}) {
     ? data.message
     : '';
   const contentHTML = isDrawing
-    ? (drawingSrc ? `<img class="post-drawing" src="${drawingSrc}" alt="desenho" loading="lazy" />` : '')
+    ? (drawingSrc ? `<img class="post-drawing" src="${drawingSrc}" alt="desenho" loading="lazy" />${data.caption ? `<div class="post-drawing-caption">${escapeHTML(data.caption)}</div>` : ''}` : '')
     : `<div class="post-content">${escapeHTML(data.message || '')}</div>`;
 
   const el = document.createElement('article');

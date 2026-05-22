@@ -186,7 +186,7 @@
           <div class="composer-input-slot">
             <textarea id="messageField" class="composer-textarea"
               placeholder="o que tá rolando na festa?" maxlength="300"
-              autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+              autocomplete="off" autocorrect="on" autocapitalize="sentences" spellcheck="true"></textarea>
             <div class="draw-toolbar hidden" id="drawControls">
               <div class="color-picker-wrapper">
                 <div id="colorPreview" class="color-preview"></div>
@@ -227,6 +227,12 @@
         <div id="drawSection" class="draw-section hidden">
           <div class="canvas-container">
             <canvas id="drawCanvas" width="600" height="800"></canvas>
+          </div>
+          <div class="draw-caption-wrap">
+            <input type="text" id="drawCaption" class="draw-caption-input"
+              placeholder="legenda (opcional)" maxlength="100"
+              autocomplete="off" autocorrect="on" autocapitalize="sentences" spellcheck="true" />
+            <span class="draw-caption-count"><span id="drawCaptionCount">0</span>/100</span>
           </div>
         </div>
 

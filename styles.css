@@ -474,6 +474,42 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 8px;
+}
+
+.draw-caption-wrap {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.draw-caption-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 7px 14px;
+  color: var(--text-primary);
+  font-family: var(--font-main);
+  font-size: 0.82rem;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.draw-caption-input:focus {
+  border-color: var(--purple-accent);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.draw-caption-input::placeholder { color: var(--text-muted); }
+
+.draw-caption-count {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  min-width: 36px;
+  text-align: right;
 }
 
 .canvas-container {

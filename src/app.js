@@ -571,6 +571,8 @@ const drawControls = document.getElementById('drawControls');
 const eraserBtn = document.getElementById('eraserBtn');
 const rainbowBtn = document.getElementById('rainbowBtn');
 const brushSizeSlider = document.getElementById('brushSize');
+const drawCaption = document.getElementById('drawCaption');
+const drawCaptionCount = document.getElementById('drawCaptionCount');
 
 const CANVAS_W = 600;
 const CANVAS_H = 800;
@@ -687,6 +689,10 @@ brushSizeSlider.addEventListener('input', () => {
   brushRadius = Number(brushSizeSlider.value);
 });
 
+drawCaption.addEventListener('input', () => {
+  drawCaptionCount.textContent = drawCaption.value.length;
+});
+
 toggleDraw.addEventListener('click', () => {
   if (inputMode === 'text') {
     inputMode = 'draw';
@@ -706,6 +712,8 @@ toggleDraw.addEventListener('click', () => {
     deactivateRainbow();
     isEraser = false;
     eraserBtn.classList.remove('eraser-active');
+    drawCaption.value = '';
+    drawCaptionCount.textContent = '0';
     messageField.focus();
   }
   updateToggleIcon();
@@ -792,6 +800,7 @@ async function handleSubmit() {
       }
     }
 
+    const captionText = inputMode === 'draw' ? (drawCaption.value.trim() || null) : null;
     const docData = {
       type: inputMode === 'text' ? 'text' : 'drawing',
       message,
@@ -800,7 +809,8 @@ async function handleSubmit() {
       gradient: me.gradient,
       likedBy: [],
       replyCount: 0,
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
+      ...(captionText ? { caption: captionText } : {}),
     };
     await addDoc(collection(db, POSTS), docData);
 
@@ -809,6 +819,8 @@ async function handleSubmit() {
     charCount.textContent = '0';
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    drawCaption.value = '';
+    drawCaptionCount.textContent = '0';
 
     if (inputMode === 'draw') toggleDraw.click();
 
@@ -1103,7 +1115,7 @@ function initReplySection(id, postEl) {
   section.innerHTML = `
     <div class="reply-thread" id="thread_${id}"></div>
     <div class="reply-composer">
-      <input class="reply-input" type="text" placeholder="responder..." maxlength="200" autocomplete="off" />
+      <input class="reply-input" type="text" placeholder="responder..." maxlength="200" autocomplete="off" autocorrect="on" autocapitalize="sentences" />
       <button class="reply-send" type="button" disabled>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
           stroke-linecap="round" stroke-linejoin="round">
@@ -1905,8 +1917,10 @@ document.addEventListener('click', e => {
   if (!img || !img.src) return;
   const postEl = img.closest('[data-id]');
   const postId = postEl?.dataset.id;
+  const postData = postId ? (postsMap.get(postId) ?? null) : null;
   let _lbUnsub = null;
   openLightbox(img.src, {
+    caption: postData?.caption || null,
     onOpen: (threadEl, composerEl) => {
       if (!postId) return;
       const q = query(collection(db, POSTS, postId, 'replies'), orderBy('createdAt', 'asc'), limit(50));
