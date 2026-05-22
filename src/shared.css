@@ -195,15 +195,27 @@ input, textarea { font-family: var(--font-main); }
   align-items: center;
   justify-content: center;
   background: #07000f;
-  max-height: 50dvh;
-  overflow: hidden;
 }
 
 .lightbox-img {
-  width: 100%;
-  max-height: 50dvh;
-  object-fit: contain;
   display: block;
+  max-width: 100%;
+  max-height: 55dvh;
+  width: auto;
+  height: auto;
+}
+
+.lightbox-actions {
+  flex-shrink: 0;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.lightbox-actions:empty {
+  display: none;
 }
 
 .lightbox-caption {

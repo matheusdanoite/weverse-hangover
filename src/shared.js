@@ -23,6 +23,7 @@ function getLightbox() {
         <img class="lightbox-img" src="" alt="desenho" />
       </div>
       <div class="lightbox-caption hidden"></div>
+      <div class="lightbox-actions"></div>
       <div class="lightbox-replies-area"></div>
     </div>
   `;
@@ -49,6 +50,8 @@ export function openLightbox(src, { onOpen, onClose, caption } = {}) {
     captionEl.textContent = '';
     captionEl.classList.add('hidden');
   }
+  const actionsEl = lb.querySelector('.lightbox-actions');
+  actionsEl.innerHTML = '';
   const repliesArea = lb.querySelector('.lightbox-replies-area');
   repliesArea.innerHTML = `
     <div class="lightbox-thread"></div>
@@ -59,7 +62,7 @@ export function openLightbox(src, { onOpen, onClose, caption } = {}) {
   `;
   _lightboxOnClose = onClose || null;
   lb.classList.add('open');
-  if (onOpen) onOpen(repliesArea.querySelector('.lightbox-thread'), repliesArea.querySelector('.lightbox-composer'));
+  if (onOpen) onOpen(repliesArea.querySelector('.lightbox-thread'), repliesArea.querySelector('.lightbox-composer'), actionsEl);
 }
 
 // Global delegated listeners

@@ -1400,6 +1400,7 @@ let isFetchingMore = false;
 const postsMap = new Map();
 const pendingNewPosts = new Map();
 let initialLoadDone = false;
+let _lightboxPostId = null;
 
 const postsQ = query(collection(db, POSTS), orderBy('createdAt', 'desc'), limit(50));
 
@@ -1438,6 +1439,10 @@ onSnapshot(postsQ, (snapshot) => {
     } else if (change.type === 'modified') {
       if (postsMap.has(id)) postsMap.set(id, data);
       if (pendingNewPosts.has(id)) pendingNewPosts.set(id, data);
+      if (id === _lightboxPostId) {
+        const actionsEl = document.querySelector('.lightbox-actions');
+        if (actionsEl) renderLightboxActions(actionsEl, id, data);
+      }
     } else if (change.type === 'removed') {
       postsMap.delete(id);
       pendingNewPosts.delete(id);
@@ -1923,6 +1928,36 @@ function showConfirmToast(text, onYes, onNo) {
 // ═══════════════════════════════════════════
 // DRAWING LIGHTBOX
 // ═══════════════════════════════════════════
+
+function renderLightboxActions(actionsEl, postId, data) {
+  if (!actionsEl || !data) return;
+  const liked = (data.likedBy || []).includes(me?.id);
+  const likeCount = (data.likedBy || []).length;
+  const replyCount = data.replyCount || 0;
+  actionsEl.innerHTML = `
+    <button class="action-btn like-btn ${liked ? 'liked' : ''}" type="button">
+      <svg width="17" height="17" viewBox="0 0 24 24"
+        fill="${liked ? 'currentColor' : 'none'}"
+        stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+      </svg>
+      <span class="count">${likeCount}</span>
+    </button>
+    <button class="action-btn reply-btn" type="button" disabled style="pointer-events:none">
+      <svg width="17" height="17" viewBox="0 0 24 24"
+        fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+      </svg>
+      <span class="count">${replyCount}</span>
+    </button>
+  `;
+  actionsEl.querySelector('.like-btn').addEventListener('click', () => {
+    toggleLike(postId, postsMap.get(postId) || data);
+  });
+}
+
 document.addEventListener('click', e => {
   const img = e.target.closest('.post-drawing');
   if (!img || !img.src) return;
@@ -1930,15 +1965,17 @@ document.addEventListener('click', e => {
   const postId = postEl?.dataset.id;
   const postData = postId ? (postsMap.get(postId) ?? null) : null;
   let _lbUnsub = null;
+  _lightboxPostId = postId || null;
   openLightbox(img.src, {
     caption: postData?.caption || null,
-    onOpen: (threadEl, composerEl) => {
+    onOpen: (threadEl, composerEl, actionsEl) => {
+      if (postId && actionsEl) renderLightboxActions(actionsEl, postId, postsMap.get(postId) || postData);
       if (!postId) return;
       const q = query(collection(db, POSTS, postId, 'replies'), orderBy('createdAt', 'asc'), limit(50));
       _lbUnsub = onSnapshot(q, snap => renderLightboxThread(threadEl, snap));
       wireLightboxComposer(composerEl, postId);
     },
-    onClose: () => { _lbUnsub?.(); _lbUnsub = null; },
+    onClose: () => { _lbUnsub?.(); _lbUnsub = null; _lightboxPostId = null; },
   });
 });
 
