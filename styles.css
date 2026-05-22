@@ -686,6 +686,8 @@ html, body {
   color: #fff;
 }
 
+.trending-section .post { padding-bottom: 12px; }
+
 /* ════════════ TAB EMPTY STATE ════════════ */
 .tab-empty {
   text-align: center;
@@ -754,7 +756,6 @@ html, body {
 
 .drawing-tile {
   position: relative;
-  aspect-ratio: 3 / 4;
   overflow: hidden;
   border-radius: 0;
   background: var(--bg);
@@ -793,6 +794,7 @@ html, body {
   -webkit-backdrop-filter: blur(8px);
   transition: background 0.15s;
   line-height: 1;
+  margin-left: 25px;
 }
 
 .tile-like-btn:hover { background: rgba(30, 5, 50, 0.88); }

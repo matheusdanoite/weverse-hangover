@@ -208,6 +208,21 @@ input, textarea { font-family: var(--font-main); }
   height: auto;
 }
 
+.lightbox-author {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.lightbox-author-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
 .lightbox-actions {
   flex-shrink: 0;
   display: flex;

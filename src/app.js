@@ -1516,6 +1516,14 @@ function cleanupTrendingSections() {
 function renderTrending() {
   updateTabCounts();
   feed.classList.remove('feed-gallery');
+  feed.querySelectorAll('.drawing-tile').forEach(el => {
+    const id = el.dataset.id;
+    seenObserver.unobserve(el);
+    visibilityObserver.unobserve(el);
+    visibleCards.delete(id);
+    cardElements.delete(id);
+    el.remove();
+  });
   feed.querySelector('.tab-empty')?.remove();
   loadSentinel.remove();
 
@@ -2060,6 +2068,8 @@ document.addEventListener('click', e => {
   _lightboxPostId = postId || null;
   openLightbox(img.src, {
     caption: postData?.caption || null,
+    author: postData?.author || null,
+    gradient: postData?.gradient || null,
     onOpen: (threadEl, composerEl, actionsEl) => {
       if (postId && actionsEl) renderLightboxActions(actionsEl, postId, postsMap.get(postId) || postData);
       if (!postId) return;

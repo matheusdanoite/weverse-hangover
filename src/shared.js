@@ -22,6 +22,10 @@ function getLightbox() {
       <div class="lightbox-img-wrap">
         <img class="lightbox-img" src="" alt="desenho" />
       </div>
+      <div class="lightbox-author hidden">
+        <div class="lightbox-author-avatar avatar avatar-sm"></div>
+        <span class="lightbox-author-name"></span>
+      </div>
       <div class="lightbox-caption hidden"></div>
       <div class="lightbox-actions"></div>
       <div class="lightbox-replies-area"></div>
@@ -39,7 +43,7 @@ function getLightbox() {
   return ov;
 }
 
-export function openLightbox(src, { onOpen, onClose, caption } = {}) {
+export function openLightbox(src, { onOpen, onClose, caption, author, gradient } = {}) {
   const lb = getLightbox();
   lb.querySelector('.lightbox-img').src = src;
   const captionEl = lb.querySelector('.lightbox-caption');
@@ -49,6 +53,17 @@ export function openLightbox(src, { onOpen, onClose, caption } = {}) {
   } else {
     captionEl.textContent = '';
     captionEl.classList.add('hidden');
+  }
+  const authorEl = lb.querySelector('.lightbox-author');
+  if (author) {
+    const avatarEl = authorEl.querySelector('.lightbox-author-avatar');
+    avatarEl.style.backgroundImage = gradientCSS(gradient?.length === 2 ? gradient : null);
+    avatarEl.style.backgroundSize = '130% 130%';
+    avatarEl.style.backgroundPosition = 'center center';
+    authorEl.querySelector('.lightbox-author-name').textContent = author;
+    authorEl.classList.remove('hidden');
+  } else {
+    authorEl.classList.add('hidden');
   }
   const actionsEl = lb.querySelector('.lightbox-actions');
   actionsEl.innerHTML = '';
