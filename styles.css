@@ -686,7 +686,7 @@ html, body {
   color: #fff;
 }
 
-.trending-section .post { padding-bottom: 12px; }
+.trending-section .post { margin-top: 10px; margin-bottom: 10px; }
 
 /* ════════════ TAB EMPTY STATE ════════════ */
 .tab-empty {
@@ -710,8 +710,6 @@ html, body {
 .feed {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  margin-top: 4px;
 }
 
 /* ════════════ LAZY SCROLL SENTINEL ════════════ */
@@ -748,7 +746,6 @@ html, body {
 .feed-gallery {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 1px;
   align-items: start;
 }
 

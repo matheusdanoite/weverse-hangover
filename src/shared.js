@@ -25,9 +25,9 @@ function getLightbox() {
       <div class="lightbox-author hidden">
         <div class="lightbox-author-avatar avatar avatar-sm"></div>
         <span class="lightbox-author-name"></span>
+        <div class="lightbox-actions"></div>
       </div>
       <div class="lightbox-caption hidden"></div>
-      <div class="lightbox-actions"></div>
       <div class="lightbox-replies-area"></div>
     </div>
   `;

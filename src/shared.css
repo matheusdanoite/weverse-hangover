@@ -213,7 +213,10 @@ input, textarea { font-family: var(--font-main); }
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 14px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 14px;
+  padding-right: 47px;
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -224,12 +227,10 @@ input, textarea { font-family: var(--font-main); }
 }
 
 .lightbox-actions {
-  flex-shrink: 0;
   display: flex;
   gap: 4px;
   align-items: center;
-  padding: 6px 14px;
-  border-bottom: 1px solid var(--border-subtle);
+  margin-left: auto;
 }
 
 .lightbox-actions:empty {
