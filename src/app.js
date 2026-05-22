@@ -1093,12 +1093,13 @@ function updatePostElement(el, id, data) {
 
 async function toggleLike(id, data) {
   if (!me) return openOnboarding();
-  const liked = (data.likedBy || []).includes(me.id);
-  if (data.authorId === me.id && !liked) {
-    showConfirmToast('Alguém te ama mais do que você mesmo?', () => {}, () => _doLike(id, data, liked));
+  const current = postsMap.get(id) || data;
+  const liked = (current.likedBy || []).includes(me.id);
+  if (current.authorId === me.id && !liked) {
+    showConfirmToast('Alguém te ama mais do que você mesmo?', () => {}, () => _doLike(id, current, liked));
     return;
   }
-  await _doLike(id, data, liked);
+  await _doLike(id, current, liked);
 }
 
 async function _doLike(id, data, liked) {
@@ -1516,11 +1517,14 @@ function cleanupTrendingSections() {
 function renderTrending() {
   updateTabCounts();
   feed.classList.remove('feed-gallery');
-  feed.querySelectorAll('.drawing-tile').forEach(el => {
+  feed.querySelectorAll('[data-id]').forEach(el => {
+    if (el.closest('.trending-section')) return;
     const id = el.dataset.id;
     seenObserver.unobserve(el);
+    replySubObserver.unobserve(el);
     visibilityObserver.unobserve(el);
     visibleCards.delete(id);
+    if (replySubs.has(id)) { replySubs.get(id)(); replySubs.delete(id); }
     cardElements.delete(id);
     el.remove();
   });

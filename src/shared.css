@@ -124,8 +124,8 @@ input, textarea { font-family: var(--font-main); }
 
 .post-drawing {
   max-width: 250px; width: 100%; aspect-ratio: 3 / 4;
-  border-radius: var(--radius-md); background: #fff;
-  margin: 4px auto 0; border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  margin: 10px auto; border: 1px solid var(--border-subtle);
   object-fit: cover; display: block;
   cursor: pointer;
   touch-action: manipulation;
@@ -182,7 +182,7 @@ input, textarea { font-family: var(--font-main); }
   border-radius: 50%;
   border: none;
   background: rgba(255, 255, 255, 0.1);
-  color: var(--text-primary);
+  color: var(--red);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -216,7 +216,7 @@ input, textarea { font-family: var(--font-main); }
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 14px;
-  padding-right: 47px;
+  padding-right: 14px;
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -239,11 +239,12 @@ input, textarea { font-family: var(--font-main); }
 
 .lightbox-caption {
   flex-shrink: 0;
-  padding: 8px 16px 10px;
+  padding: 10px 16px 10px;
   font-size: 0.88rem;
   line-height: 1.4;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border-subtle);
+  text-align: center;
 }
 
 .post-drawing-caption {

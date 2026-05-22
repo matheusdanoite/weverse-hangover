@@ -791,7 +791,7 @@ html, body {
   -webkit-backdrop-filter: blur(8px);
   transition: background 0.15s;
   line-height: 1;
-  margin-left: 25px;
+  margin-left: 13px;
 }
 
 .tile-like-btn:hover { background: rgba(30, 5, 50, 0.88); }
