@@ -537,9 +537,9 @@ html, body {
   z-index: 40;
   display: flex;
   gap: 0;
-  background: linear-gradient(to bottom, rgba(26, 10, 46, 0.95), rgba(26, 10, 46, 0.88));
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: linear-gradient(to bottom, rgba(26, 10, 46, 0.78), rgba(26, 10, 46, 0.62));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   margin: 0 -12px;
   padding: 4px 12px 0;
   border-bottom: 1px solid var(--border-subtle);
@@ -628,6 +628,10 @@ html, body {
   font-weight: 700;
   letter-spacing: 2px;
   text-transform: uppercase;
+}
+
+.rank-strip--commented {
+  margin-top: 28px;
 }
 
 .rank-strip::before {
@@ -1274,8 +1278,11 @@ html, body {
 
 .notif-type-like    .notif-type-chip { color: var(--pink-neon); }
 .notif-type-comment .notif-type-chip { color: var(--blue-electric); }
+.notif-type-mention .notif-type-chip { color: var(--purple-accent); }
 .notif-type-report  .notif-type-chip { color: #ff9800; }
 .notif-type-restore .notif-type-chip { color: #4caf50; }
+
+.notif-item.notif-type-mention.unread::before { background: var(--purple-accent); }
 
 .notif-content {
   flex: 1;

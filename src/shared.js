@@ -88,6 +88,10 @@ export function escapeHTML(str) {
   return div.innerHTML;
 }
 
+export function highlightMentions(escapedText) {
+  return escapedText.replace(/@([a-zA-Z0-9._]{1,40})/g, '<span class="mention-tag">@$1</span>');
+}
+
 /** Relative time (e.g. "3m", "2h") — used by main feed */
 export function formatTime(ts) {
   if (!ts) return 'agora';
@@ -150,8 +154,8 @@ export function buildPostCard(id, data, opts = {}) {
     ? data.message
     : '';
   const contentHTML = isDrawing
-    ? (drawingSrc ? `<img class="post-drawing" src="${drawingSrc}" alt="desenho" loading="lazy" />${data.caption ? `<div class="post-drawing-caption">${escapeHTML(data.caption)}</div>` : ''}` : '')
-    : `<div class="post-content">${escapeHTML(data.message || '')}</div>`;
+    ? (drawingSrc ? `<img class="post-drawing" src="${drawingSrc}" alt="desenho" loading="lazy" />${data.caption ? `<div class="post-drawing-caption">${highlightMentions(escapeHTML(data.caption))}</div>` : ''}` : '')
+    : `<div class="post-content">${highlightMentions(escapeHTML(data.message || ''))}</div>`;
 
   const el = document.createElement('article');
   el.className = 'post';

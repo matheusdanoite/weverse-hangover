@@ -10,6 +10,10 @@ service cloud.firestore {
     match /hangul_messages/{postId}/replies/{replyId} {
       allow read, write: if true;
     }
+    // Necessário para collectionGroup(db, 'replies') em deleteUserData
+    match /{path=**}/replies/{replyId} {
+      allow read, write: if true;
+    }
 
     match /hangul_usernames/{username} {
       allow read: if true;
@@ -18,6 +22,16 @@ service cloud.firestore {
 
     match /hangul_fcm_tokens/{tokenId} {
       allow read: if false;
+      allow write: if true;
+    }
+
+    match /hangul_bans/{userId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /hangul_mentions/{mentionId} {
+      allow read: if true;
       allow write: if true;
     }
 

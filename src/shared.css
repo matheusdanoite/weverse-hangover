@@ -117,6 +117,11 @@ input, textarea { font-family: var(--font-main); }
   color: var(--text-primary);
 }
 
+.mention-tag {
+  color: var(--blue-electric);
+  font-weight: 600;
+}
+
 .post-drawing {
   max-width: 250px; width: 100%; aspect-ratio: 3 / 4;
   border-radius: var(--radius-md); background: #fff;
@@ -124,8 +129,6 @@ input, textarea { font-family: var(--font-main); }
   object-fit: cover; display: block;
   cursor: pointer;
   touch-action: manipulation;
-  position: relative;
-  left: -26px;
 }
 
 /* ════════════ LIGHTBOX ════════════ */
@@ -232,6 +235,7 @@ input, textarea { font-family: var(--font-main); }
   color: var(--text-secondary);
   line-height: 1.35;
   padding: 5px 0 2px;
+  text-align: center;
 }
 
 .lightbox-replies-area {

@@ -12,7 +12,7 @@ import {
   where, getDocs, deleteDoc, getDoc, setDoc
 } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js';
 import {
-  gradientCSS, setGradientBg, escapeHTML,
+  gradientCSS, setGradientBg, escapeHTML, highlightMentions,
   formatTime, buildPostCard, updatePostCard, openLightbox,
 } from './shared.js';
 
@@ -812,7 +812,9 @@ async function handleSubmit() {
       createdAt: serverTimestamp(),
       ...(captionText ? { caption: captionText } : {}),
     };
-    await addDoc(collection(db, POSTS), docData);
+    const postRef = await addDoc(collection(db, POSTS), docData);
+    if (inputMode === 'text') writeMentions(message, postRef.id, 'post');
+    else if (captionText) writeMentions(captionText, postRef.id, 'post');
 
     messageField.value = '';
     messageField.style.height = 'auto';
@@ -857,10 +859,21 @@ function getPostsForTab(tab) {
   switch (tab) {
     case 'texts':    return all.filter(([, d]) => d.type !== 'drawing').sort(cmp);
     case 'drawings': return all.filter(([, d]) => d.type === 'drawing').sort(cmp);
-    case 'top':      return all.slice().sort((a, b) => (b[1].likedBy?.length || 0) - (a[1].likedBy?.length || 0)).slice(0, 10);
+    case 'top':      return all.filter(([, d]) => (d.likedBy?.length || 0) > 0).sort((a, b) => (b[1].likedBy?.length || 0) - (a[1].likedBy?.length || 0)).slice(0, 10);
     case 'mods':     return all.filter(([, d]) => MOD_NAMES.has(d.author)).sort(cmp);
     default:         return all.sort(cmp);
   }
+}
+
+function getTopCommented() {
+  const result = [];
+  for (const [id, data] of postsMap.entries()) {
+    const _rc = data.reportedBy?.length || 0;
+    const _mc = data.maintainedCount || 0;
+    if (_rc >= 7 && _rc > _mc) continue;
+    if ((data.replyCount || 0) > 0) result.push([id, data]);
+  }
+  return result.sort((a, b) => (b[1].replyCount || 0) - (a[1].replyCount || 0)).slice(0, 10);
 }
 
 let _tabCountsCache = '';
@@ -1155,9 +1168,10 @@ function initReplySection(id, postEl) {
       await updateDoc(doc(db, POSTS, id), {
         replyCount: increment(1),
         lastReplyAuthor: me.name,
-        lastReplyText: txt.slice(0, 100)
+        lastReplyText: txt.slice(0, 100),
+        replyUniqueAuthors: arrayUnion(me.id),
       });
-      if (txt.startsWith('@')) writeMention(txt, id);
+      writeMentions(txt, id, 'reply');
       input.value = '';
     } catch (err) {
       console.error('reply error', err);
@@ -1180,26 +1194,30 @@ function initReplySection(id, postEl) {
   replySubs.set(id, unsub);
 }
 
-async function writeMention(txt, postId) {
-  const match = txt.match(/^@([a-zA-Z0-9._]+)/);
-  if (!match) return;
-  const mentionedName = match[1];
-  if (mentionedName.toLowerCase() === me.name.toLowerCase()) return;
-  try {
-    const userSnap = await getDoc(doc(db, USERS, mentionedName.toLowerCase()));
-    if (!userSnap.exists()) return;
-    const ud = userSnap.data();
-    await addDoc(collection(db, MENTIONS), {
-      toUserId: ud.userId,
-      toName: ud.displayName || mentionedName,
-      fromName: me.name,
-      fromId: me.id,
-      fromGradient: me.gradient,
-      postId,
-      replyText: txt.slice(0, 100),
-      createdAt: serverTimestamp(),
-    });
-  } catch {}
+async function writeMentions(txt, postId, context = 'reply') {
+  if (!me || !txt) return;
+  const names = [...new Set(
+    [...txt.matchAll(/@([a-zA-Z0-9._]{1,40})/g)].map(m => m[1])
+  )].filter(n => n.toLowerCase() !== me.name.toLowerCase());
+  if (!names.length) return;
+  for (const mentionedName of names) {
+    try {
+      const userSnap = await getDoc(doc(db, USERS, mentionedName.toLowerCase()));
+      if (!userSnap.exists()) continue;
+      const ud = userSnap.data();
+      await addDoc(collection(db, MENTIONS), {
+        toUserId: ud.userId,
+        toName: ud.displayName || mentionedName,
+        fromName: me.name,
+        fromId: me.id,
+        fromGradient: me.gradient,
+        postId,
+        replyText: txt.slice(0, 100),
+        context,
+        createdAt: serverTimestamp(),
+      });
+    } catch {}
+  }
 }
 
 function renderReplyThread(id, snap) {
@@ -1226,7 +1244,7 @@ function renderReplyThread(id, snap) {
           ${MOD_NAMES.has(r.author) ? '<span class="mod-star mod-star-sm">★</span>' : ''}
           <span class="reply-time">${formatTime(r.createdAt)}</span>
         </div>
-        <div class="reply-content">${escapeHTML(r.message)}</div>
+        <div class="reply-content">${highlightMentions(escapeHTML(r.message))}</div>
         <div class="reply-actions">
           <button class="reply-like-btn ${liked ? 'liked' : ''}" type="button">
             <svg width="13" height="13" viewBox="0 0 24 24"
@@ -1482,23 +1500,93 @@ updateFeedBtn.addEventListener('click', () => {
   renderFeed();
 });
 
+function cleanupTrendingSections() {
+  feed.querySelectorAll('.trending-section [data-id]').forEach(el => {
+    seenObserver.unobserve(el);
+    replySubObserver.unobserve(el);
+    visibilityObserver.unobserve(el);
+    const id = el.dataset.id;
+    visibleCards.delete(id);
+    if (replySubs.has(id)) { replySubs.get(id)(); replySubs.delete(id); }
+    cardElements.delete(id);
+  });
+  feed.querySelectorAll('.rank-strip, .trending-section').forEach(el => el.remove());
+}
+
+function renderTrending() {
+  updateTabCounts();
+  feed.classList.remove('feed-gallery');
+  feed.querySelector('.tab-empty')?.remove();
+  loadSentinel.remove();
+
+  const likedPosts     = getPostsForTab('top');
+  const commentedPosts = getTopCommented();
+
+  // ── Liked section ──────────────────────────────────────────
+  let likedStrip   = feed.querySelector('.rank-strip--liked');
+  let likedSection = feed.querySelector('.trending-section--liked');
+  if (!likedStrip) {
+    likedStrip = document.createElement('div');
+    likedStrip.className = 'rank-strip rank-strip--liked';
+    likedStrip.textContent = 'posts mais curtidos da noite';
+    feed.insertBefore(likedStrip, feed.firstChild);
+  }
+  if (!likedSection) {
+    likedSection = document.createElement('div');
+    likedSection.className = 'trending-section trending-section--liked';
+    likedStrip.after(likedSection);
+  }
+  likedStrip.hidden = likedPosts.length === 0;
+  renderInto(likedSection, likedPosts);
+  likedSection.querySelectorAll('.post[data-id]').forEach((el, i) => {
+    el.classList.add('post-rank');
+    el.dataset.rank = '#' + (i + 1);
+  });
+
+  // ── Commented section ──────────────────────────────────────
+  let commentedStrip   = feed.querySelector('.rank-strip--commented');
+  let commentedSection = feed.querySelector('.trending-section--commented');
+  if (!commentedStrip) {
+    commentedStrip = document.createElement('div');
+    commentedStrip.className = 'rank-strip rank-strip--commented';
+    commentedStrip.textContent = 'posts mais comentados da noite';
+    likedSection.after(commentedStrip);
+  }
+  if (!commentedSection) {
+    commentedSection = document.createElement('div');
+    commentedSection.className = 'trending-section trending-section--commented';
+    commentedStrip.after(commentedSection);
+  }
+  commentedStrip.hidden = commentedPosts.length === 0;
+  renderInto(commentedSection, commentedPosts);
+  commentedSection.querySelectorAll('.post[data-id]').forEach((el, i) => {
+    el.classList.add('post-rank');
+    el.dataset.rank = '#' + (i + 1);
+  });
+
+  // ── Empty state ────────────────────────────────────────────
+  if (likedPosts.length === 0 && commentedPosts.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'tab-empty';
+    empty.innerHTML = '<span class="icon">✦</span><p>nada por aqui ainda.</p>';
+    feed.appendChild(empty);
+  }
+}
+
 function renderFeed() {
-  const allPosts = getPostsForTab(activeTab);
-  const posts = allPosts.slice(0, renderedCount);
   updateTabCounts();
 
-  // Rank strip (only for Trending)
-  let rankStrip = feed.querySelector('.rank-strip');
+  // Trending tab has its own render path with two sections
   if (activeTab === 'top') {
-    if (!rankStrip) {
-      rankStrip = document.createElement('div');
-      rankStrip.className = 'rank-strip';
-      rankStrip.textContent = 'posts mais curtidos da noite';
-      feed.insertBefore(rankStrip, feed.firstChild);
-    }
-  } else {
-    rankStrip?.remove();
+    renderTrending();
+    return;
   }
+
+  // Leaving 'top' tab — tear down its sections
+  cleanupTrendingSections();
+
+  const allPosts = getPostsForTab(activeTab);
+  const posts = allPosts.slice(0, renderedCount);
 
   const isGallery = activeTab === 'drawings';
   feed.classList.toggle('feed-gallery', isGallery);
@@ -1532,15 +1620,10 @@ function renderFeed() {
     renderInto(feed, posts);
   }
 
-  // Rank badges
-  feed.querySelectorAll('.post[data-id]').forEach((el, i) => {
-    if (activeTab === 'top') {
-      el.classList.add('post-rank');
-      el.dataset.rank = '#' + (i + 1);
-    } else {
-      el.classList.remove('post-rank');
-      el.removeAttribute('data-rank');
-    }
+  // Rank badges (non-top tabs: remove any leftover badges)
+  feed.querySelectorAll('.post[data-id]').forEach(el => {
+    el.classList.remove('post-rank');
+    el.removeAttribute('data-rank');
   });
 
   // Sentinel: show when there are more posts to reveal or fetch
@@ -1790,11 +1873,12 @@ function renderNotifList() {
     }
 
     if (replies > 0) {
-      const hasNew  = replies > (base.replies || 0);
-      const author  = data.lastReplyAuthor || 'alguém';
-      const extra   = replies - 1;
+      const hasNew      = replies > (base.replies || 0);
+      const author      = data.lastReplyAuthor || 'alguém';
+      const uniqueCount = data.replyUniqueAuthors?.length || 1;
+      const extra       = uniqueCount - 1;
       const textHTML = extra > 0
-        ? `<strong>${escapeHTML(author)}</strong> e mais ${extra} comentaram no seu post.`
+        ? `<strong>${escapeHTML(author)}</strong> e mais ${extra} ${extra === 1 ? 'pessoa comentaram' : 'pessoas comentaram'} no seu post.`
         : `<strong>${escapeHTML(author)}</strong> comentou no seu post.`;
       const preview = data.lastReplyText
         ? data.lastReplyText.slice(0, 100)
@@ -1817,7 +1901,9 @@ function renderNotifList() {
 
   mentionsData.forEach(m => {
     const hasNew = !mentionsSeen.has(m.id);
-    const textHTML = `<strong>${escapeHTML(m.fromName)}</strong> te mencionou em uma resposta.`;
+    const textHTML = m.context === 'post'
+      ? `<strong>${escapeHTML(m.fromName)}</strong> te mencionou em um post.`
+      : `<strong>${escapeHTML(m.fromName)}</strong> te mencionou em uma resposta.`;
     items.push({
       id: m.postId,
       postDate: m.createdAt?.seconds || 0,
@@ -2003,7 +2089,7 @@ function renderLightboxThread(threadEl, snap) {
           ${MOD_NAMES.has(r.author) ? '<span class="mod-star mod-star-sm">★</span>' : ''}
           <span class="reply-time">${formatTime(r.createdAt)}</span>
         </div>
-        <div class="reply-content">${escapeHTML(r.message)}</div>
+        <div class="reply-content">${highlightMentions(escapeHTML(r.message))}</div>
       </div>
     `;
     threadEl.appendChild(item);
@@ -2031,7 +2117,9 @@ function wireLightboxComposer(composerEl, postId) {
         replyCount: increment(1),
         lastReplyAuthor: me.name,
         lastReplyText: txt.slice(0, 100),
+        replyUniqueAuthors: arrayUnion(me.id),
       });
+      writeMentions(txt, postId, 'reply');
       input.value = '';
     } catch (err) {
       console.error('lightbox reply error', err);
