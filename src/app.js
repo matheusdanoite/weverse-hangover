@@ -23,6 +23,7 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const POSTS = 'hangul_messages';
 const USERS = 'hangul_usernames';
+const BANS  = 'hangul_bans';
 
 const MOD_NAMES = new Set((firebaseConfig.moderatorProfiles || []).map(p => p.name));
 const MOD_IDS   = new Set((firebaseConfig.moderatorProfiles || []).map(p => p.id));
@@ -204,8 +205,21 @@ function paintUserUI() {
   setGradientBg(document.getElementById('miniAvatar'), me.gradient);
 }
 
-if (!me) openOnboarding();
-else paintUserUI();
+const banScreen = document.getElementById('banScreen');
+
+function showBanScreen() {
+  banScreen.classList.remove('hidden');
+  onboardOverlay.classList.add('hidden');
+}
+
+if (!me) {
+  openOnboarding();
+} else {
+  paintUserUI();
+  getDoc(doc(db, BANS, me.id)).then(snap => {
+    if (snap.exists()) showBanScreen();
+  }).catch(() => {});
+}
 
 // ── Admin auth ──
 onAuthStateChanged(auth, async (user) => {
@@ -517,16 +531,18 @@ const colorPreview = document.getElementById('colorPreview');
 const drawControls = document.getElementById('drawControls');
 const eraserBtn = document.getElementById('eraserBtn');
 const rainbowBtn = document.getElementById('rainbowBtn');
+const brushSizeSlider = document.getElementById('brushSize');
 
 const CANVAS_W = 600;
 const CANVAS_H = 800;
 
 let inputMode = 'text';
 let brushColor = '#ff2d78';
-const brushRadius = 5;
+let brushRadius = 5;
 let isDrawing = false;
 let lastX = 0, lastY = 0;
 let isRainbow = false;
+let isEraser = false;
 let rainbowHue = 0;
 
 const ctx = drawCanvas.getContext('2d');
@@ -537,13 +553,13 @@ ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
 // SVG icons
 const SVG_BRUSH = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z"/><path d="M9 8c-2 3-4 3.5-7 4l8 10c2-1 6-5 6-7"/><path d="M14.5 17.5 4.5 15"/></svg>`;
-const SVG_TEXT = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>`;
+const SVG_CLOSE = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
 
 function updateToggleIcon() {
   if (inputMode === 'text') {
     toggleIconWrap.innerHTML = SVG_BRUSH;
   } else {
-    toggleIconWrap.innerHTML = SVG_TEXT;
+    toggleIconWrap.innerHTML = SVG_CLOSE;
   }
 }
 updateToggleIcon();
@@ -558,6 +574,7 @@ function getCanvasPos(e) {
 }
 
 function currentColor() {
+  if (isEraser) return '#ffffff';
   if (isRainbow) {
     rainbowHue = (rainbowHue + 4) % 360;
     return `hsl(${rainbowHue}, 100%, 50%)`;
@@ -608,24 +625,27 @@ brushColorInput.addEventListener('input', (e) => {
   brushColor = e.target.value;
   colorPreview.style.background = brushColor;
   deactivateRainbow();
+  isEraser = false;
   eraserBtn.classList.remove('eraser-active');
 });
 
 eraserBtn.addEventListener('click', () => {
-  brushColor = '#ffffff';
-  colorPreview.style.background = '#ffffff';
-  deactivateRainbow();
-  eraserBtn.classList.toggle('eraser-active');
+  isEraser = !isEraser;
+  eraserBtn.classList.toggle('eraser-active', isEraser);
+  if (isEraser) deactivateRainbow();
 });
 
 rainbowBtn.addEventListener('click', () => {
   isRainbow = !isRainbow;
   rainbowBtn.classList.toggle('rainbow-active', isRainbow);
-  eraserBtn.classList.remove('eraser-active');
   if (isRainbow) {
-    brushColor = '#ff2d78';
-    colorPreview.style.background = brushColor;
+    isEraser = false;
+    eraserBtn.classList.remove('eraser-active');
   }
+});
+
+brushSizeSlider.addEventListener('input', () => {
+  brushRadius = Number(brushSizeSlider.value);
 });
 
 toggleDraw.addEventListener('click', () => {
@@ -645,6 +665,7 @@ toggleDraw.addEventListener('click', () => {
     charCountWrapper.classList.remove('hidden');
     drawControls.classList.add('hidden');
     deactivateRainbow();
+    isEraser = false;
     eraserBtn.classList.remove('eraser-active');
     messageField.focus();
   }
@@ -905,8 +926,7 @@ function buildDrawingTile(id, data) {
   el.className = 'drawing-tile';
   el.dataset.id = id;
   el.innerHTML = `
-    <img class="post-drawing tile-img" src="${data.message || ''}" alt="desenho" loading="lazy" />
-    <div class="tile-overlay">
+    <div class="tile-like-bar">
       <button class="tile-like-btn${liked ? ' liked' : ''}" type="button">
         <svg width="14" height="14" viewBox="0 0 24 24"
           fill="${liked ? 'currentColor' : 'none'}"
@@ -917,6 +937,7 @@ function buildDrawingTile(id, data) {
         ${likeCount > 0 ? `<span class="tile-like-count">${likeCount}</span>` : ''}
       </button>
     </div>
+    <img class="post-drawing tile-img" src="${data.message || ''}" alt="desenho" loading="lazy" />
   `;
   el.querySelector('.tile-like-btn').addEventListener('click', (e) => {
     e.stopPropagation();

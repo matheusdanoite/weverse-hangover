@@ -207,6 +207,7 @@
                   <path d="M2 20a10 10 0 0 1 20 0"/>
                 </svg>
               </button>
+              <input type="range" id="brushSize" min="2" max="24" value="5" class="brush-size-slider" title="Tamanho do pincel" />
             </div>
           </div>
           <button id="toggleDraw" class="pill-draw-btn" type="button" title="Alternar texto / desenho">
@@ -280,6 +281,14 @@
     <div class="confirm-toast-actions">
       <button class="confirm-btn confirm-yes" type="button">sim</button>
       <button class="confirm-btn confirm-no" type="button">não</button>
+    </div>
+  </div>
+
+  <div id="banScreen" class="ban-screen hidden">
+    <div class="ban-card">
+      <div class="ban-icon">🚫</div>
+      <h1 class="ban-title">E foi de arrasta</h1>
+      <p class="ban-subtitle">Seu dispositivo foi banido do Weverse Hangover. Melhore.</p>
     </div>
   </div>
 
