@@ -1590,6 +1590,7 @@ function renderFeed() {
 
   const isGallery = activeTab === 'drawings';
   feed.classList.toggle('feed-gallery', isGallery);
+  feed.classList.toggle('feed-list', !isGallery);
 
   if (allPosts.length === 0) {
     feed.querySelectorAll('[data-id]').forEach(el => {

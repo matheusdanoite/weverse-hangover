@@ -741,6 +741,8 @@ html, body {
 }
 
 /* ════════════ DRAWING GALLERY ════════════ */
+.feed-list { gap: 14px; }
+
 .feed-gallery {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -755,7 +757,7 @@ html, body {
   aspect-ratio: 3 / 4;
   overflow: hidden;
   border-radius: 0;
-  background: #fff;
+  background: var(--bg);
   cursor: pointer;
 }
 
@@ -772,7 +774,7 @@ html, body {
 .drawing-tile .tile-img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   display: block;
 }
 
