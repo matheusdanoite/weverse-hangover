@@ -90,7 +90,7 @@ confirmOk.addEventListener('click', () => {
 // ── Manter dialog ──
 function openMaintainDialog(post, onOk) {
   const count = post.reportedBy?.length || 0;
-  const needsNote = count >= 3;
+  const needsNote = count >= 7;
   maintainDesc.textContent = `Post de @${post.author || 'anônimo'} com ${count} denúncia${count !== 1 ? 's' : ''}. O post voltará a ser visível para todos.`;
   maintainNoteWrap.classList.toggle('hidden', !needsNote);
   maintainNoteInput.value = '';

@@ -849,7 +849,7 @@ function getPostsForTab(tab) {
   for (const [id, data] of postsMap.entries()) {
     const _rc = data.reportedBy?.length || 0;
     const _mc = data.maintainedCount || 0;
-    if (_rc >= 3 && _rc > _mc) continue;
+    if (_rc >= 7 && _rc > _mc) continue;
     all.push([id, data]);
   }
   const cmp = (a, b) => (b[1].createdAt?.seconds || 0) - (a[1].createdAt?.seconds || 0);
@@ -868,7 +868,7 @@ function updateTabCounts() {
   for (const [, data] of postsMap.entries()) {
     const _rc = data.reportedBy?.length || 0;
     const _mc = data.maintainedCount || 0;
-    if (_rc >= 3 && _rc > _mc) continue;
+    if (_rc >= 7 && _rc > _mc) continue;
     all.push(data);
   }
   const texts    = all.filter(d => d.type !== 'drawing').length;
@@ -1336,8 +1336,16 @@ function renderReplyThread(id, snap) {
 
 async function toggleReplyLike(postId, replyId, data) {
   if (!me) return openOnboarding();
-  const ref = doc(db, POSTS, postId, 'replies', replyId);
   const liked = (data.likedBy || []).includes(me.id);
+  if (data.authorId === me.id && !liked) {
+    showConfirmToast('Alguém te ama mais do que você mesmo?', () => {}, () => _doReplyLike(postId, replyId, data, liked));
+    return;
+  }
+  await _doReplyLike(postId, replyId, data, liked);
+}
+
+async function _doReplyLike(postId, replyId, data, liked) {
+  const ref = doc(db, POSTS, postId, 'replies', replyId);
   try {
     await updateDoc(ref, { likedBy: liked ? arrayRemove(me.id) : arrayUnion(me.id) });
   } catch (err) {
@@ -1690,8 +1698,8 @@ function updateNotifications() {
     const maintainCount = data.maintainedCount || 0;
     if (likes > (base.likes || 0)) unread++;
     if (replies > (base.replies || 0)) unread++;
-    if (reportCount >= 3 && reportCount > maintainCount && reportCount > (base.reportNotified || 0)) unread++;
-    if (maintainCount > 0 && data.maintainNote && maintainCount >= reportCount && reportCount >= 3 && maintainCount > (base.maintainNotified || 0)) unread++;
+    if (reportCount >= 7 && reportCount > maintainCount && reportCount > (base.reportNotified || 0)) unread++;
+    if (maintainCount > 0 && data.maintainNote && maintainCount >= reportCount && reportCount >= 7 && maintainCount > (base.maintainNotified || 0)) unread++;
   });
   mentionsData.forEach(m => { if (!mentionsSeen.has(m.id)) unread++; });
   if (unread > 0) {
@@ -1754,6 +1762,7 @@ function renderNotifList() {
     const maintainCount = data.maintainedCount || 0;
     const postDate      = data.createdAt?.seconds || 0;
     const isDrawing     = data.type === 'drawing';
+    const drawingSrc    = isDrawing ? (data.message || '') : '';
     const postPreviewText = isDrawing ? '' : (data.message || '').slice(0, 100);
 
     if (likes > 0) {
@@ -1767,7 +1776,7 @@ function renderNotifList() {
       const otherLikerIds = (data.likedBy || [])
         .filter(uid => uid !== me?.id && uid !== data.lastLikerId)
         .slice(-3);
-      items.push({ id, postDate, hasNew, icon: heartSVG, type: 'like', avatarName: liker, extra, textHTML, isDrawing, preview: postPreviewText, likerGradient, otherLikerIds });
+      items.push({ id, postDate, hasNew, icon: heartSVG, type: 'like', avatarName: liker, extra, textHTML, isDrawing, drawingSrc, preview: postPreviewText, likerGradient, otherLikerIds });
     }
 
     if (replies > 0) {
@@ -1780,19 +1789,19 @@ function renderNotifList() {
       const preview = data.lastReplyText
         ? data.lastReplyText.slice(0, 100)
         : postPreviewText;
-      items.push({ id, postDate, hasNew, icon: chatSVG, type: 'comment', avatarName: author, extra, textHTML, isDrawing, preview });
+      items.push({ id, postDate, hasNew, icon: chatSVG, type: 'comment', avatarName: author, extra, textHTML, isDrawing, drawingSrc, preview });
     }
 
-    const isRemoved = reportCount >= 3 && reportCount > maintainCount;
+    const isRemoved = reportCount >= 7 && reportCount > maintainCount;
     if (isRemoved) {
       const hasNew = reportCount > (base.reportNotified || 0);
-      items.push({ id, postDate, hasNew, icon: alertSVG, type: 'report', avatarName: null, extra: 0, textHTML: 'Seu post recebeu três denúncias e foi retirado para avaliação dos hosts.', isDrawing, preview: postPreviewText });
+      items.push({ id, postDate, hasNew, icon: alertSVG, type: 'report', avatarName: null, extra: 0, textHTML: 'Seu post recebeu sete denúncias e foi retirado para avaliação dos hosts.', isDrawing, drawingSrc, preview: postPreviewText });
     }
 
-    const isRestored = reportCount >= 3 && maintainCount >= reportCount && data.maintainNote;
+    const isRestored = reportCount >= 7 && maintainCount >= reportCount && data.maintainNote;
     if (isRestored) {
       const hasNew = maintainCount > (base.maintainNotified || 0);
-      items.push({ id, postDate, hasNew, icon: checkSVG, type: 'restore', avatarName: null, extra: 0, textHTML: 'Após análise dos moderadores, seu post voltou ao ar.', isDrawing, preview: (data.maintainNote || '').slice(0, 100) });
+      items.push({ id, postDate, hasNew, icon: checkSVG, type: 'restore', avatarName: null, extra: 0, textHTML: 'Após análise dos moderadores, seu post voltou ao ar.', isDrawing, drawingSrc, preview: (data.maintainNote || '').slice(0, 100) });
     }
   });
 
@@ -1825,7 +1834,7 @@ function renderNotifList() {
     return;
   }
 
-  items.forEach(({ id, hasNew, icon, type, avatarName, extra, textHTML, isDrawing, preview, likerGradient, otherLikerIds }) => {
+  items.forEach(({ id, hasNew, icon, type, avatarName, extra, textHTML, isDrawing, drawingSrc, preview, likerGradient, otherLikerIds }) => {
     const wrap = document.createElement('div');
     wrap.className = `notif-item notif-type-${type}${hasNew ? ' unread' : ''}`;
 
@@ -1843,7 +1852,9 @@ function renderNotifList() {
     }
 
     let previewHTML = '';
-    if (isDrawing) {
+    if (isDrawing && drawingSrc) {
+      previewHTML = `<img class="notif-drawing-thumb" src="${drawingSrc}" alt="desenho" />`;
+    } else if (isDrawing) {
       previewHTML = `<div class="notif-post-preview is-drawing">${drawSVG} desenho</div>`;
     } else if (preview) {
       previewHTML = `<div class="notif-post-preview">${escapeHTML(preview)}${preview.length >= 100 ? '…' : ''}</div>`;
