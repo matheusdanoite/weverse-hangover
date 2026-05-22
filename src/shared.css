@@ -403,6 +403,23 @@ input, textarea { font-family: var(--font-main); }
 .reply-like-btn.liked     { color: var(--pink-neon); }
 .reply-like-btn.liked svg { fill: var(--pink-neon); }
 
+.reply-reply-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 6px 3px 2px; border-radius: 999px; border: none;
+  background: transparent; color: var(--text-muted);
+  font-size: 0.75rem; font-weight: 600;
+  cursor: pointer; transition: color 0.2s;
+}
+.reply-reply-btn:hover { color: var(--purple-accent); }
+
+.replies-toggle-btn {
+  display: block; width: 100%; text-align: left;
+  padding: 5px 0 5px 32px; background: transparent; border: none;
+  color: var(--purple-accent); font-size: 0.78rem; font-weight: 600;
+  cursor: pointer; transition: color 0.2s; margin-top: 2px;
+}
+.replies-toggle-btn:hover { color: var(--text-primary); }
+
 .reply-delete {
   background: rgba(255, 59, 59, 0.08); border: 1px solid rgba(255, 59, 59, 0.18);
   color: var(--red); padding: 3px 9px; border-radius: 6px; font-size: 0.7rem;

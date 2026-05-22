@@ -21,9 +21,10 @@ const firebaseConfig = await fetch('/api/config').then(r => r.json());
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-const POSTS = 'hangul_messages';
-const USERS = 'hangul_usernames';
-const BANS  = 'hangul_bans';
+const POSTS    = 'hangul_messages';
+const USERS    = 'hangul_usernames';
+const BANS     = 'hangul_bans';
+const MENTIONS = 'hangul_mentions';
 
 const MOD_NAMES = new Set((firebaseConfig.moderatorProfiles || []).map(p => p.name));
 const MOD_IDS   = new Set((firebaseConfig.moderatorProfiles || []).map(p => p.id));
@@ -37,6 +38,7 @@ const LS = {
   PREV_USER: 'hangul.prevUser',
   SEEN: 'hangul.seenPosts',
   BASE: 'hangul.notifsBase',
+  MENTIONS_SEEN: 'hangul.mentionsSeen',
 };
 
 function uuid() {
@@ -64,10 +66,21 @@ function loadBaseline() {
 }
 function saveBaseline(b) { localStorage.setItem(LS.BASE, JSON.stringify(b)); }
 
+function loadMentionsSeen() {
+  try { return new Set(JSON.parse(localStorage.getItem(LS.MENTIONS_SEEN)) || []); }
+  catch { return new Set(); }
+}
+function saveMentionsSeen(s) {
+  localStorage.setItem(LS.MENTIONS_SEEN, JSON.stringify(Array.from(s)));
+}
+
 let me = loadUser();
 const seenAtStart = loadSeen();
 const seenThisSession = new Set();
 let notifBaseline = loadBaseline();
+let mentionsData = [];
+let mentionsSeen = loadMentionsSeen();
+let _mentionsUnsub = null;
 
 
 // ═══════════════════════════════════════════
@@ -193,6 +206,7 @@ onboardSubmit.addEventListener('click', async () => {
 
     onboardOverlay.classList.add('hidden');
     paintUserUI();
+    listenMentions();
     updateReplyCcomposersGradient();
   } finally {
     onboardSubmit.disabled = !termsCheck.checked;
@@ -203,6 +217,21 @@ onboardSubmit.addEventListener('click', async () => {
 function paintUserUI() {
   if (!me) return;
   setGradientBg(document.getElementById('miniAvatar'), me.gradient);
+}
+
+function listenMentions() {
+  if (!me) return;
+  if (_mentionsUnsub) { _mentionsUnsub(); _mentionsUnsub = null; }
+  const q = query(
+    collection(db, MENTIONS),
+    where('toUserId', '==', me.id),
+    orderBy('createdAt', 'desc'),
+    limit(20)
+  );
+  _mentionsUnsub = onSnapshot(q, snap => {
+    mentionsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    updateNotifications();
+  }, () => {});
 }
 
 const banScreen = document.getElementById('banScreen');
@@ -216,6 +245,7 @@ if (!me) {
   openOnboarding();
 } else {
   paintUserUI();
+  listenMentions();
   getDoc(doc(db, BANS, me.id)).then(snap => {
     if (snap.exists()) showBanScreen();
   }).catch(() => {});
@@ -252,6 +282,7 @@ onAuthStateChanged(auth, async (user) => {
     saveUser(me);
     onboardOverlay.classList.add('hidden');
     paintUserUI();
+    listenMentions();
     updateReplyCcomposersGradient();
     try {
       await setDoc(doc(db, USERS, profile.name), {
@@ -1038,7 +1069,7 @@ async function toggleLike(id, data) {
   if (!me) return openOnboarding();
   const liked = (data.likedBy || []).includes(me.id);
   if (data.authorId === me.id && !liked) {
-    showConfirmToast('Alguém te ama mais que você?', () => _doLike(id, data, liked), null);
+    showConfirmToast('Alguém te ama mais do que você mesmo?', () => {}, () => _doLike(id, data, liked));
     return;
   }
   await _doLike(id, data, liked);
@@ -1113,6 +1144,7 @@ function initReplySection(id, postEl) {
         lastReplyAuthor: me.name,
         lastReplyText: txt.slice(0, 100)
       });
+      if (txt.startsWith('@')) writeMention(txt, id);
       input.value = '';
     } catch (err) {
       console.error('reply error', err);
@@ -1135,13 +1167,37 @@ function initReplySection(id, postEl) {
   replySubs.set(id, unsub);
 }
 
+async function writeMention(txt, postId) {
+  const match = txt.match(/^@([a-zA-Z0-9._]+)/);
+  if (!match) return;
+  const mentionedName = match[1];
+  if (mentionedName.toLowerCase() === me.name.toLowerCase()) return;
+  try {
+    const userSnap = await getDoc(doc(db, USERS, mentionedName.toLowerCase()));
+    if (!userSnap.exists()) return;
+    const ud = userSnap.data();
+    await addDoc(collection(db, MENTIONS), {
+      toUserId: ud.userId,
+      toName: ud.displayName || mentionedName,
+      fromName: me.name,
+      fromId: me.id,
+      fromGradient: me.gradient,
+      postId,
+      replyText: txt.slice(0, 100),
+      createdAt: serverTimestamp(),
+    });
+  } catch {}
+}
+
 function renderReplyThread(id, snap) {
   const thread = document.getElementById(`thread_${id}`);
   if (!thread) return;
   thread.innerHTML = '';
-  snap.forEach(d => {
-    const r = d.data();
-    const replyId = d.id;
+
+  const replies = [];
+  snap.forEach(d => replies.push({ replyId: d.id, ...d.data() }));
+
+  function buildReplyItem(r) {
     const grad = r.gradient?.length === 2 ? gradientCSS(r.gradient) : gradientCSS(['#ff2d78', '#9b59ff']);
     const isMine = r.authorId === me?.id;
     const reported = (r.reportedBy || []).includes(me?.id);
@@ -1168,6 +1224,13 @@ function renderReplyThread(id, snap) {
             </svg>
             ${likeCount > 0 ? `<span>${likeCount}</span>` : ''}
           </button>
+          <button class="reply-reply-btn" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 17 4 12 9 7"/>
+              <path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
+            </svg>
+            responder
+          </button>
         </div>
       </div>
       <div class="post-menu">
@@ -1185,7 +1248,38 @@ function renderReplyThread(id, snap) {
       </div>
     `;
 
-    item.querySelector('.reply-like-btn').addEventListener('click', () => toggleReplyLike(id, replyId, r));
+    item.querySelector('.reply-like-btn').addEventListener('click', () => toggleReplyLike(id, r.replyId, r));
+
+    item.querySelector('.reply-reply-btn').addEventListener('click', () => {
+      const mention = `@${r.author} `;
+      const postEl = document.querySelector(`.post[data-id="${id}"]`);
+      if (!postEl) return;
+      const section = postEl.querySelector('.replies-section');
+      const input = section?.querySelector('.reply-input');
+      if (input) {
+        const composer = section.querySelector('.reply-composer');
+        input.value = mention;
+        input.dispatchEvent(new Event('input'));
+        composer?.classList.add('open');
+        input.focus();
+        input.setSelectionRange(mention.length, mention.length);
+        composer?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } else {
+        initReplySection(id, postEl);
+        requestAnimationFrame(() => {
+          const newInput = postEl.querySelector('.reply-input');
+          const newComposer = postEl.querySelector('.reply-composer');
+          if (newInput) {
+            newInput.value = mention;
+            newInput.dispatchEvent(new Event('input'));
+            newComposer?.classList.add('open');
+            newInput.focus();
+            newInput.setSelectionRange(mention.length, mention.length);
+            newComposer?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        });
+      }
+    });
 
     const menuBtn = item.querySelector('.post-menu-btn');
     const menuEl  = item.querySelector('.post-menu');
@@ -1199,17 +1293,33 @@ function renderReplyThread(id, snap) {
     if (isMine) {
       item.querySelector('.reply-selfdelete-btn')?.addEventListener('click', () => {
         menuEl.classList.remove('open');
-        selfDeleteReply(id, replyId, item);
+        selfDeleteReply(id, r.replyId, item);
       });
     } else {
       item.querySelector('.reply-report-btn')?.addEventListener('click', () => {
         menuEl.classList.remove('open');
-        reportReply(id, replyId, r);
+        reportReply(id, r.replyId, r);
       });
     }
 
-    thread.appendChild(item);
-  });
+    return item;
+  }
+
+  const MAX_VISIBLE = 5;
+  const visible = replies.slice(0, MAX_VISIBLE);
+  visible.forEach(r => thread.appendChild(buildReplyItem(r)));
+
+  if (replies.length > MAX_VISIBLE) {
+    const remaining = replies.slice(MAX_VISIBLE);
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'replies-toggle-btn';
+    toggleBtn.textContent = `Ver mais (${remaining.length})`;
+    toggleBtn.addEventListener('click', () => {
+      toggleBtn.remove();
+      remaining.forEach(r => thread.appendChild(buildReplyItem(r)));
+    });
+    thread.appendChild(toggleBtn);
+  }
 }
 
 async function toggleReplyLike(postId, replyId, data) {
@@ -1571,6 +1681,7 @@ function updateNotifications() {
     if (reportCount >= 3 && reportCount > maintainCount && reportCount > (base.reportNotified || 0)) unread++;
     if (maintainCount > 0 && data.maintainNote && maintainCount >= reportCount && reportCount >= 3 && maintainCount > (base.maintainNotified || 0)) unread++;
   });
+  mentionsData.forEach(m => { if (!mentionsSeen.has(m.id)) unread++; });
   if (unread > 0) {
     notifBadge.textContent = unread;
     notifBadge.classList.remove('hidden');
@@ -1597,6 +1708,8 @@ function closeNotifDrawer() {
     };
   });
   saveBaseline(notifBaseline);
+  mentionsData.forEach(m => mentionsSeen.add(m.id));
+  saveMentionsSeen(mentionsSeen);
   updateNotifications();
 }
 
@@ -1614,11 +1727,12 @@ function renderNotifList() {
   const own = ownPosts();
   const items = [];
 
-  const heartSVG  = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
-  const chatSVG   = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`;
-  const alertSVG  = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`;
-  const checkSVG  = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
-  const drawSVG   = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z"/><path d="M9 8c-2 3-4 3.5-7 4l8 10c2-1 6-5 6-7"/></svg>`;
+  const heartSVG   = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+  const chatSVG    = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`;
+  const alertSVG   = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`;
+  const checkSVG   = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
+  const mentionSVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/></svg>`;
+  const drawSVG    = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z"/><path d="M9 8c-2 3-4 3.5-7 4l8 10c2-1 6-5 6-7"/></svg>`;
 
   own.forEach(([id, data]) => {
     const base = notifBaseline[id] || { likes: 0, replies: 0, reportNotified: 0, maintainNotified: 0 };
@@ -1668,6 +1782,25 @@ function renderNotifList() {
       const hasNew = maintainCount > (base.maintainNotified || 0);
       items.push({ id, postDate, hasNew, icon: checkSVG, type: 'restore', avatarName: null, extra: 0, textHTML: 'Após análise dos moderadores, seu post voltou ao ar.', isDrawing, preview: (data.maintainNote || '').slice(0, 100) });
     }
+  });
+
+  mentionsData.forEach(m => {
+    const hasNew = !mentionsSeen.has(m.id);
+    const textHTML = `<strong>${escapeHTML(m.fromName)}</strong> te mencionou em uma resposta.`;
+    items.push({
+      id: m.postId,
+      postDate: m.createdAt?.seconds || 0,
+      hasNew,
+      icon: mentionSVG,
+      type: 'mention',
+      avatarName: m.fromName,
+      extra: 0,
+      textHTML,
+      isDrawing: false,
+      preview: m.replyText || '',
+      likerGradient: m.fromGradient || null,
+      otherLikerIds: [],
+    });
   });
 
   items.sort((a, b) => {
