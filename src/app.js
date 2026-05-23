@@ -1191,8 +1191,42 @@ function renderReplyThread(id, snap) {
   if (!thread) return;
   thread.innerHTML = '';
 
-  const replies = [];
-  snap.forEach(d => replies.push({ replyId: d.id, ...d.data() }));
+  const now = Date.now();
+  const allReplies = [];
+  snap.forEach(d => allReplies.push({ replyId: d.id, ...d.data() }));
+
+  // Schedule activation timers for replies whose time hasn't come yet
+  allReplies.forEach(r => {
+    const ts = r.createdAt?.seconds
+      ? r.createdAt.seconds * 1000
+      : (r.createdAt?.toDate?.()?.getTime() ?? 0);
+    if (ts <= now || r.activated) return;
+    const timerKey = `${id}_${r.replyId}`;
+    if (_scheduledReplyTimers.has(timerKey)) return;
+    const timerId = setTimeout(async () => {
+      _scheduledReplyTimers.delete(timerKey);
+      try {
+        const replyRef = doc(db, POSTS, id, 'replies', r.replyId);
+        const replySnap = await getDoc(replyRef);
+        if (!replySnap.exists() || replySnap.data().activated) return;
+        await updateDoc(replyRef, { activated: true });
+        await updateDoc(doc(db, POSTS, id), {
+          replyCount: increment(1),
+          lastReplyAuthor: r.author,
+          lastReplyText: (r.message || '').slice(0, 100),
+        });
+      } catch { }
+    }, ts - now);
+    _scheduledReplyTimers.set(timerKey, timerId);
+  });
+
+  // Only render replies that are currently visible (createdAt <= now)
+  const replies = allReplies.filter(r => {
+    const ts = r.createdAt?.seconds
+      ? r.createdAt.seconds * 1000
+      : (r.createdAt?.toDate?.()?.getTime() ?? 0);
+    return ts <= now;
+  });
 
   function buildReplyItem(r) {
     const grad = r.gradient?.length === 2 ? gradientCSS(r.gradient) : gradientCSS(['#ff2d78', '#9b59ff']);
@@ -1378,6 +1412,7 @@ let isFetchingMore = false;
 const postsMap = new Map();
 const pendingNewPosts = new Map();
 const scheduledPosts = new Map();
+const _scheduledReplyTimers = new Map(); // key: `${postId}_${replyId}`
 let initialLoadDone = false;
 let _lightboxPostId = null;
 

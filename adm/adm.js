@@ -78,6 +78,7 @@ let toastTimer          = null;
 let unsubscribePosts    = null;
 let composeAvatarPhotoData = null;
 let activeTab           = 'reports';
+const _replyTimers      = {}; // { [`${postId}_${replyId}`]: timeoutId }
 let idolProfiles        = [];
 let selectedIdolProfile = null;
 let pendingEdit         = null;
@@ -1199,6 +1200,8 @@ function buildRepliesSection(post, tabKey) {
     const replyAuthor = localReplyProfile ? localReplyProfile.name  : modProfile.name;
     const replyGrad   = localReplyProfile ? localReplyProfile.gradient : modProfile.gradient;
     const replyAvatar = localReplyProfile?.avatarPhoto || null;
+    const schedTime   = replyTimeInput?.value ? new Date(replyTimeInput.value).getTime() : null;
+    const isFutureReply = schedTime !== null && schedTime > Date.now();
     const createdAt   = replyTimeInput?.value
       ? Timestamp.fromDate(new Date(replyTimeInput.value))
       : serverTimestamp();
@@ -1213,11 +1216,13 @@ function buildRepliesSection(post, tabKey) {
         ...(localReplyProfile ? { isIdolPost: true } : {}),
         createdAt,
       });
-      await updateDoc(doc(db, POSTS, post.docId), {
-        replyCount: increment(1),
-        lastReplyAuthor: replyAuthor,
-        lastReplyText: txt.slice(0, 100),
-      });
+      if (!isFutureReply) {
+        await updateDoc(doc(db, POSTS, post.docId), {
+          replyCount: increment(1),
+          lastReplyAuthor: replyAuthor,
+          lastReplyText: txt.slice(0, 100),
+        });
+      }
       input.value = '';
       if (replyTimeInput) replyTimeInput.value = nowDatetimeLocal();
     } catch (err) {
@@ -1247,9 +1252,9 @@ function buildRepliesSection(post, tabKey) {
       if (!replyUnsubs[tabKey][post.docId]) {
         const q = query(collection(db, POSTS, post.docId, 'replies'), orderBy('createdAt', 'asc'), limit(50));
         replyUnsubs[tabKey][post.docId] = onSnapshot(q, snap => {
-          renderIdolReplyThread(thread, snap, post.docId);
+          const visibleCount = renderIdolReplyThread(thread, snap, post.docId);
           const span = toggle.querySelector('span');
-          if (span) span.textContent = `${snap.size} respostas`;
+          if (span) span.textContent = `${visibleCount} respostas`;
         });
       }
     }
@@ -1260,12 +1265,49 @@ function buildRepliesSection(post, tabKey) {
 
 function renderIdolReplyThread(thread, snap, postId) {
   thread.innerHTML = '';
-  if (snap.empty) {
+  const now = Date.now();
+
+  const allReplies = [];
+  snap.forEach(d => allReplies.push({ replyId: d.id, ...d.data() }));
+
+  // Only show replies whose scheduled time has passed
+  const visible = allReplies.filter(r => {
+    const ts = r.createdAt?.seconds
+      ? r.createdAt.seconds * 1000
+      : (r.createdAt?.toDate?.()?.getTime() ?? 0);
+    return ts <= now;
+  });
+
+  // Schedule activation timers for future replies
+  allReplies.forEach(r => {
+    const ts = r.createdAt?.seconds
+      ? r.createdAt.seconds * 1000
+      : (r.createdAt?.toDate?.()?.getTime() ?? 0);
+    if (ts <= now || r.activated) return;
+    const timerKey = `${postId}_${r.replyId}`;
+    clearTimeout(_replyTimers[timerKey]);
+    _replyTimers[timerKey] = setTimeout(async () => {
+      delete _replyTimers[timerKey];
+      try {
+        const replyRef = doc(db, POSTS, postId, 'replies', r.replyId);
+        const replySnap = await getDoc(replyRef);
+        if (!replySnap.exists() || replySnap.data().activated) return;
+        await updateDoc(replyRef, { activated: true });
+        await updateDoc(doc(db, POSTS, postId), {
+          replyCount: increment(1),
+          lastReplyAuthor: r.author,
+          lastReplyText: (r.message || '').slice(0, 100),
+        });
+      } catch { }
+    }, ts - now);
+  });
+
+  if (visible.length === 0) {
     thread.innerHTML = '<div class="replies-empty">nenhuma resposta ainda</div>';
-    return;
+    return 0;
   }
-  snap.forEach(d => {
-    const r = d.data();
+
+  visible.forEach(r => {
     const grad = r.gradient?.length === 2 ? gradientCSS(r.gradient) : gradientCSS(['#ff2d78', '#9b59ff']);
 
     const item = document.createElement('div');
@@ -1296,7 +1338,7 @@ function renderIdolReplyThread(thread, snap, postId) {
     delBtn.addEventListener('click', async () => {
       if (!confirm(`Deletar resposta de @${r.author || 'anônimo'}?`)) return;
       try {
-        await deleteDoc(doc(db, POSTS, postId, 'replies', d.id));
+        await deleteDoc(doc(db, POSTS, postId, 'replies', r.replyId));
         showToast('resposta deletada', 'success');
       } catch (err) {
         showToast('erro: ' + err.message, 'error');
@@ -1308,6 +1350,8 @@ function renderIdolReplyThread(thread, snap, postId) {
     item.appendChild(delBtn);
     thread.appendChild(item);
   });
+
+  return visible.length;
 }
 
 // ═══════════════════════════════════════════════════════════════
