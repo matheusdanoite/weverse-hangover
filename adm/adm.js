@@ -65,6 +65,15 @@ let toastTimer        = null;
 let unsubscribePosts  = null;
 let composeAvatarPhotoData = null;
 
+function getDeviceId() {
+  let id = localStorage.getItem('hangul.adm.deviceId');
+  if (!id) {
+    id = crypto.randomUUID?.() ?? (Math.random().toString(36).slice(2) + Date.now().toString(36));
+    localStorage.setItem('hangul.adm.deviceId', id);
+  }
+  return id;
+}
+
 // ── Toast ──
 function showToast(text, type = '') {
   toastEl.textContent = text;
@@ -187,8 +196,11 @@ onAuthStateChanged(auth, async (user) => {
   if ('serviceWorker' in navigator && 'Notification' in window) {
     if (Notification.permission === 'default') {
       enablePushBtn.style.display = 'flex';
+      enablePushBtn.title = 'Ativar notificações push';
     } else if (Notification.permission === 'granted') {
       setupFCM();
+    } else if (Notification.permission === 'denied') {
+      _markPushDenied();
     }
   }
 });
@@ -202,24 +214,41 @@ async function setupFCM() {
       serviceWorkerRegistration: registration
     });
     if (currentToken && modProfile) {
-      await setDoc(doc(db, 'hangul_fcm_tokens', modProfile.id), {
+      // Chave por admin + dispositivo: evita que um login em outro device apague o token deste
+      await setDoc(doc(db, 'hangul_fcm_tokens', `${modProfile.id}_${getDeviceId()}`), {
         token: currentToken,
         role: 'mod',
         updatedAt: serverTimestamp()
       });
       enablePushBtn.style.display = 'none';
+
+      // Notificações em foreground (quando a aba /adm/ está aberta e visível)
+      const bc = new BroadcastChannel('hangul-push');
+      bc.addEventListener('message', ({ data }) => {
+        showToast(`🔔 ${data.body || data.title}`, 'success');
+      });
     }
   } catch (err) {
     console.log('FCM setup failed or blocked:', err);
   }
 }
 
+function _markPushDenied() {
+  enablePushBtn.disabled = true;
+  enablePushBtn.title = 'Notificações bloqueadas — altere nas configurações do browser';
+  enablePushBtn.style.opacity = '0.4';
+  enablePushBtn.style.cursor = 'not-allowed';
+  enablePushBtn.style.display = 'flex';
+}
+
 enablePushBtn.addEventListener('click', async () => {
+  if (enablePushBtn.disabled) return;
   const permission = await Notification.requestPermission();
   if (permission === 'granted') {
     setupFCM();
-  } else {
-    enablePushBtn.style.display = 'none';
+  } else if (permission === 'denied') {
+    _markPushDenied();
+    showToast('notificações bloqueadas pelo browser', 'error');
   }
 });
 

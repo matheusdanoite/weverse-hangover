@@ -40,52 +40,67 @@ export async function onRequestPost(context) {
     });
     const fsData = await fsResponse.json();
     
-    const tokens = [];
+    // { fcmToken, docName } — docName é o caminho completo do Firestore (usado para deletar tokens inválidos)
+    const tokenDocs = [];
     if (fsData.documents) {
-      fsData.documents.forEach(doc => {
-        // Only target mods (role = 'mod')
-        if (doc.fields && doc.fields.role && doc.fields.role.stringValue === 'mod' && doc.fields.token) {
-           tokens.push(doc.fields.token.stringValue);
+      fsData.documents.forEach(fsDoc => {
+        if (fsDoc.fields?.role?.stringValue === 'mod' && fsDoc.fields.token) {
+          tokenDocs.push({ fcmToken: fsDoc.fields.token.stringValue, docName: fsDoc.name });
         }
       });
     }
 
-    if (tokens.length === 0) {
+    if (tokenDocs.length === 0) {
       return new Response(JSON.stringify({ success: true, reason: "No mods found" }), { status: 200 });
     }
 
     // 4. Send Push Notifications via FCM HTTP v1
     const fcmUrl = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
-    
-    const promises = tokens.map(targetToken => {
-      const payload = {
-        message: {
-          token: targetToken,
-          notification: {
-            title: "Nova Denúncia no Hangul",
-            body: safeText || "Um post acaba de ser denunciado."
+    const origin = new URL(request.url).origin;
+
+    // Promise.allSettled garante que um token inválido não cancela os demais
+    const fcmResults = await Promise.allSettled(
+      tokenDocs.map(({ fcmToken, docName }) =>
+        fetch(fcmUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
           },
-          webpush: {
-            fcm_options: {
-              link: "https://weverse-hangover.pages.dev/adm/"
+          body: JSON.stringify({
+            message: {
+              token: fcmToken,
+              notification: {
+                title: "Nova Denúncia no Hangul",
+                body: safeText || "Um post acaba de ser denunciado."
+              },
+              webpush: {
+                fcm_options: { link: `${origin}/adm/` }
+              }
             }
-          }
-        }
-      };
+          })
+        }).then(res => ({ status: res.status, docName }))
+      )
+    );
 
-      return fetch(fcmUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-    });
+    // Remove tokens obsoletos: FCM retorna 404 para tokens expirados/desregistrados
+    const staleDocNames = fcmResults
+      .filter(r => r.status === 'fulfilled' && (r.value.status === 404 || r.value.status === 410))
+      .map(r => r.value.docName);
 
-    await Promise.all(promises);
+    if (staleDocNames.length > 0) {
+      await Promise.allSettled(
+        staleDocNames.map(docName =>
+          fetch(`https://firestore.googleapis.com/v1/${docName}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` }
+          })
+        )
+      );
+    }
 
-    return new Response(JSON.stringify({ success: true, count: tokens.length }), { status: 200 });
+    const sent = fcmResults.filter(r => r.status === 'fulfilled' && r.value.status === 200).length;
+    return new Response(JSON.stringify({ success: true, sent, total: tokenDocs.length }), { status: 200 });
 
   } catch {
     return new Response('Internal Server Error', { status: 500 });
