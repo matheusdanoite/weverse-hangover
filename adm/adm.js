@@ -58,7 +58,10 @@ const maintainCancel     = document.getElementById('maintainCancel');
 const maintainOk         = document.getElementById('maintainOk');
 const tabReports          = document.getElementById('tabReports');
 const tabIdols            = document.getElementById('tabIdols');
+const tabFeed             = document.getElementById('tabFeed');
 const idolsList           = document.getElementById('idolsList');
+const feedList            = document.getElementById('feedList');
+const composeSection      = document.getElementById('composeSection');
 const profileSelector     = document.getElementById('profileSelector');
 const profileSelectorList = document.getElementById('profileSelectorList');
 const editModalOverlay    = document.getElementById('editModalOverlay');
@@ -78,7 +81,7 @@ let activeTab           = 'reports';
 let idolProfiles        = [];
 let selectedIdolProfile = null;
 let pendingEdit         = null;
-let idolReplyUnsubs     = {};
+let replyUnsubs         = { idol: {}, feed: {} };
 
 function getDeviceId() {
   let id = localStorage.getItem('hangul.adm.deviceId');
@@ -442,6 +445,7 @@ function loadPosts() {
     (snap) => {
       allPosts = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
       if (activeTab === 'idols') renderIdols();
+      else if (activeTab === 'feed') renderFeed();
       else renderReports();
     },
     (e) => {
@@ -830,28 +834,30 @@ if (toggleCountdownBtn && countdownTimeInput) {
 function setActiveTab(tab) {
   activeTab = tab;
   tabReports.classList.toggle('active', tab === 'reports');
-  tabIdols.classList.toggle('active', tab === 'idols');
+  tabIdols.classList.toggle('active',   tab === 'idols');
+  tabFeed.classList.toggle('active',    tab === 'feed');
 
-  reportsList.style.display    = tab === 'reports' ? '' : 'none';
-  idolsList.style.display      = tab === 'idols'   ? '' : 'none';
+  reportsList.style.display     = tab === 'reports' ? '' : 'none';
+  idolsList.style.display       = tab === 'idols'   ? '' : 'none';
+  feedList.style.display        = tab === 'feed'    ? '' : 'none';
   profileSelector.style.display = tab === 'idols'   ? '' : 'none';
+  composeSection.style.display  = tab === 'idols'   ? '' : 'none';
 
-  // Hide search when switching tabs
   searchBar.style.display = 'none';
   searchInput.value = '';
 
-  // Hide reports label when on idols tab
   if (tab === 'reports') {
     renderReports();
   } else {
     reportsSectionLabel.style.display = 'none';
-    loadIdolProfiles();
-    renderIdols();
+    if (tab === 'idols') { loadIdolProfiles(); renderIdols(); }
+    else                 { renderFeed(); }
   }
 }
 
 tabReports.addEventListener('click', () => setActiveTab('reports'));
 tabIdols.addEventListener('click',   () => setActiveTab('idols'));
+tabFeed.addEventListener('click',    () => setActiveTab('feed'));
 
 // ═══════════════════════════════════════════════════════════════
 // ── Idol Profiles ──
@@ -999,8 +1005,8 @@ function renderIdols() {
   });
 
   // Unsubscribe all reply listeners (DOM is being rebuilt)
-  Object.values(idolReplyUnsubs).forEach(fn => fn?.());
-  idolReplyUnsubs = {};
+  Object.values(replyUnsubs.idol).forEach(fn => fn?.());
+  replyUnsubs.idol = {};
 
   idolsList.innerHTML = '';
 
@@ -1061,12 +1067,52 @@ function buildIdolItem(post) {
   actionBar.appendChild(editBtn);
   actionBar.appendChild(delBtn);
   wrap.appendChild(actionBar);
-  wrap.appendChild(buildIdolRepliesSection(post));
+  wrap.appendChild(buildRepliesSection(post, 'idol'));
 
   return wrap;
 }
 
-function buildIdolRepliesSection(post) {
+function buildReplyProfileSelector(getLocal, setLocal) {
+  const row = document.createElement('div');
+  row.className = 'reply-profile-selector';
+
+  const label = document.createElement('span');
+  label.className = 'reply-profile-label';
+  label.textContent = 'como:';
+  row.appendChild(label);
+
+  function refresh() {
+    [...row.children].forEach(c => { if (c !== label) c.remove(); });
+    const cur = getLocal();
+
+    const modPill = document.createElement('button');
+    modPill.className = 'reply-profile-pill' + (cur === null ? ' active' : '');
+    modPill.type = 'button';
+    modPill.textContent = modProfile?.name || 'admin';
+    modPill.addEventListener('click', () => { setLocal(null); refresh(); });
+    row.appendChild(modPill);
+
+    idolProfiles.forEach(profile => {
+      const pill = document.createElement('button');
+      pill.className = 'reply-profile-pill' + (cur?.id === profile.id ? ' active' : '');
+      pill.type = 'button';
+      if (profile.avatarPhoto) {
+        const av = document.createElement('div');
+        av.className = 'reply-profile-pill-avatar';
+        av.style.backgroundImage = `url(${profile.avatarPhoto})`;
+        pill.appendChild(av);
+      }
+      pill.appendChild(document.createTextNode(profile.name));
+      pill.addEventListener('click', () => { setLocal(profile); refresh(); });
+      row.appendChild(pill);
+    });
+  }
+
+  refresh();
+  return row;
+}
+
+function buildRepliesSection(post, tabKey) {
   const section = document.createElement('div');
   section.className = 'idol-replies-section';
 
@@ -1092,6 +1138,19 @@ function buildIdolRepliesSection(post) {
   // Reply composer
   const composer = document.createElement('div');
   composer.className = 'idol-reply-composer';
+  composer.style.flexDirection = 'column';
+  composer.style.gap = '6px';
+
+  // Local profile state (defaults to null = reply as mod)
+  let localReplyProfile = null;
+  const profileSelectorEl = buildReplyProfileSelector(
+    () => localReplyProfile,
+    (p) => { localReplyProfile = p; }
+  );
+  composer.appendChild(profileSelectorEl);
+
+  const inputRow = document.createElement('div');
+  inputRow.style.cssText = 'display:flex;gap:6px;align-items:center;';
 
   const input = document.createElement('input');
   input.className = 'idol-reply-input';
@@ -1112,9 +1171,9 @@ function buildIdolRepliesSection(post) {
     if (!txt || !modProfile) return;
     sendBtn.disabled = true;
 
-    const replyAuthor  = selectedIdolProfile ? selectedIdolProfile.name  : modProfile.name;
-    const replyGrad    = selectedIdolProfile ? selectedIdolProfile.gradient : modProfile.gradient;
-    const replyAvatar  = selectedIdolProfile?.avatarPhoto || null;
+    const replyAuthor = localReplyProfile ? localReplyProfile.name  : modProfile.name;
+    const replyGrad   = localReplyProfile ? localReplyProfile.gradient : modProfile.gradient;
+    const replyAvatar = localReplyProfile?.avatarPhoto || null;
 
     try {
       await addDoc(collection(db, POSTS, post.docId, 'replies'), {
@@ -1123,7 +1182,7 @@ function buildIdolRepliesSection(post) {
         authorId: modProfile.id,
         gradient: replyGrad,
         ...(replyAvatar ? { avatarPhoto: replyAvatar } : {}),
-        ...(selectedIdolProfile ? { isIdolPost: true } : {}),
+        ...(localReplyProfile ? { isIdolPost: true } : {}),
         createdAt: serverTimestamp(),
       });
       await updateDoc(doc(db, POSTS, post.docId), {
@@ -1142,8 +1201,9 @@ function buildIdolRepliesSection(post) {
   sendBtn.addEventListener('click', submitReply);
   input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submitReply(); } });
 
-  composer.appendChild(input);
-  composer.appendChild(sendBtn);
+  inputRow.appendChild(input);
+  inputRow.appendChild(sendBtn);
+  composer.appendChild(inputRow);
   content.appendChild(composer);
   section.appendChild(content);
 
@@ -1155,9 +1215,9 @@ function buildIdolRepliesSection(post) {
     } else {
       content.style.display = '';
       toggle.classList.add('open');
-      if (!idolReplyUnsubs[post.docId]) {
+      if (!replyUnsubs[tabKey][post.docId]) {
         const q = query(collection(db, POSTS, post.docId, 'replies'), orderBy('createdAt', 'asc'), limit(50));
-        idolReplyUnsubs[post.docId] = onSnapshot(q, snap => {
+        replyUnsubs[tabKey][post.docId] = onSnapshot(q, snap => {
           renderIdolReplyThread(thread, snap, post.docId);
           const span = toggle.querySelector('span');
           if (span) span.textContent = `${snap.size} respostas`;
@@ -1277,3 +1337,68 @@ editModalSave.addEventListener('click', async () => {
     editModalSave.disabled = false;
   }
 });
+
+// ═══════════════════════════════════════════════════════════════
+// ── Feed Tab ──
+// ═══════════════════════════════════════════════════════════════
+
+function renderFeed() {
+  if (activeTab !== 'feed') return;
+
+  // Remember open reply sections
+  const openSections = new Set();
+  feedList.querySelectorAll('[data-post-id]').forEach(wrap => {
+    const content = wrap.querySelector('.idol-replies-content');
+    if (content && content.style.display !== 'none') openSections.add(wrap.dataset.postId);
+  });
+
+  Object.values(replyUnsubs.feed).forEach(fn => fn?.());
+  replyUnsubs.feed = {};
+  feedList.innerHTML = '';
+
+  if (allPosts.length === 0) {
+    feedList.innerHTML = '<div class="state-empty"><p>feed vazio</p></div>';
+    return;
+  }
+
+  const sorted = [...allPosts].sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  sorted.forEach(post => {
+    const wrap = buildFeedItem(post);
+    feedList.appendChild(wrap);
+    if (openSections.has(post.docId)) wrap.querySelector('.idol-replies-toggle')?.click();
+  });
+}
+
+function buildFeedItem(post) {
+  const wrap = document.createElement('div');
+  wrap.className = 'idol-post-wrap';
+  wrap.dataset.postId = post.docId;
+
+  const card = buildPostCard(post.docId, post, {
+    me: modProfile,
+    modNames: MOD_NAMES,
+    formatTimeFn: formatTimeAbs,
+  });
+
+  // Wire the like button already rendered inside the card
+  const likeBtn = card.querySelector('.like-btn');
+  if (likeBtn) {
+    likeBtn.style.pointerEvents = 'auto';
+    likeBtn.addEventListener('click', async () => {
+      await adminToggleLike(post.docId, post);
+      const p = allPosts.find(x => x.docId === post.docId);
+      if (p) {
+        const liked = (p.likedBy || []).includes(modProfile.id);
+        likeBtn.classList.toggle('liked', liked);
+        const svg = likeBtn.querySelector('svg');
+        if (svg) svg.setAttribute('fill', liked ? 'currentColor' : 'none');
+        const countEl = likeBtn.querySelector('.count');
+        if (countEl) countEl.textContent = p.likeCount || 0;
+      }
+    });
+  }
+
+  wrap.appendChild(card);
+  wrap.appendChild(buildRepliesSection(post, 'feed'));
+  return wrap;
+}

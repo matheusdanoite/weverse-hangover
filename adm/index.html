@@ -314,6 +314,14 @@
     .btn-edit-cancel { background: var(--surface-2); border: 1px solid var(--border-subtle); color: var(--text-secondary); padding: 8px 18px; border-radius: 8px; font-size: .85rem; cursor: pointer; }
     .btn-edit-save { background: var(--purple-accent); color: #fff; padding: 8px 18px; border-radius: 8px; font-size: .85rem; font-weight: 700; cursor: pointer; transition: opacity .15s; }
     .btn-edit-save:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ── Mini reply profile selector ── */
+    .reply-profile-selector { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--border-subtle); }
+    .reply-profile-label { font-size: .64rem; color: var(--text-muted); letter-spacing: .08em; text-transform: uppercase; flex-shrink: 0; }
+    .reply-profile-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--border-subtle); font-size: .72rem; color: var(--text-secondary); cursor: pointer; transition: background .12s, border-color .12s, color .12s; }
+    .reply-profile-pill:hover { background: var(--surface-hover); }
+    .reply-profile-pill.active { background: rgba(155,89,255,.15); border-color: var(--purple-accent); color: var(--purple-accent); }
+    .reply-profile-pill-avatar { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; background-size: cover; background-position: center; }
   </style>
 </head>
 
@@ -368,10 +376,11 @@
     <div class="tab-bar">
       <button class="tab-btn active" id="tabReports">Denúncias</button>
       <button class="tab-btn" id="tabIdols">Idols</button>
+      <button class="tab-btn" id="tabFeed">Feed</button>
     </div>
 
     <!-- Composer -->
-    <section class="compose-section">
+    <section id="composeSection" class="compose-section">
       <input type="file" id="composeAvatarInput" accept="image/*" style="display:none">
       <div id="profileSelector" class="profile-selector" style="display:none;">
         <div class="profile-selector-label">postar como:</div>
@@ -417,6 +426,7 @@
     </div>
     <div id="reportsList" class="post-list"></div>
     <div id="idolsList" class="post-list" style="display:none;"></div>
+    <div id="feedList"  class="post-list" style="display:none;"></div>
 
     <div id="countdownSettingsPanel" style="margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border-subtle); display: flex; flex-direction: column; align-items: center; gap: 12px;">
       <h3 style="font-size: 1rem; color: var(--pink-neon);">Contagem Regressiva</h3>
