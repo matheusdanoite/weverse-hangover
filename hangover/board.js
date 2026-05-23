@@ -378,10 +378,7 @@ function renderCurtidos() {
 
   const meta = document.createElement('div');
   meta.className = 'hero-meta';
-  meta.innerHTML = `
-    <span class="hero-meta-tag">POST #${String(allPosts.size).padStart(4,'0')}</span>
-    <span class="hero-momentum">↑ ${heroLikes} curtidas</span>
-  `;
+  meta.innerHTML = `<span class="hero-momentum">↑ ${heroLikes} curtidas</span>`;
   heroCard.appendChild(meta);
 
   const textEl = document.createElement('div');
@@ -445,7 +442,7 @@ function renderCurtidos() {
 
     const sideMeta = document.createElement('div');
     sideMeta.className = 'side-meta';
-    sideMeta.innerHTML = `<span class="side-meta-tag">${formatTime(pd.createdAt)} atrás</span>`;
+    sideMeta.textContent = `${formatTime(pd.createdAt)} atrás`;
     card.appendChild(sideMeta);
 
     const sideText = document.createElement('div');

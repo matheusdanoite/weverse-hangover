@@ -111,7 +111,6 @@ html,body {
 .view-label-wrap {
   position:fixed;
   top:var(--hdr-h);left:0;right:0;
-  height:var(--lbl-h);
   padding:1.04vh 2.73vw 0;
   display:flex;align-items:flex-end;gap:1.56vw;
   border-bottom:1px solid rgba(255,255,255,0.14);
@@ -133,7 +132,7 @@ html,body {
   top:calc(var(--hdr-h) + var(--lbl-h));
   left:0;right:0;bottom:var(--ftr-h);
   z-index:10;overflow:hidden;
-  padding:0 2.73vw;
+  padding:0 2.73vw 2.73vw;
   display:flex;gap:1.95vw;
 }
 .board-scene.no-label { top:var(--hdr-h); }
@@ -198,10 +197,6 @@ html,body {
   font-family:var(--font-mono);font-size:1.17vw;color:var(--text-dim);
   letter-spacing:0.20vw;text-transform:uppercase;position:relative;
 }
-.hero-meta-tag {
-  background:var(--pink);color:var(--bg);
-  padding:3px 0.78vw;font-weight:800;letter-spacing:0.20vw;
-}
 .hero-momentum { margin-left:auto;color:var(--pink);font-weight:800; }
 .hero-text {
   font-family:var(--font-ui);
@@ -247,10 +242,6 @@ html,body {
 .side-meta {
   font-family:var(--font-mono);font-size:1.07vw;color:var(--text-dim);
   letter-spacing:0.20vw;text-transform:uppercase;position:relative;
-}
-.side-meta-tag {
-  background:rgba(255,45,120,0.25);color:var(--pink-lt);
-  padding:2px 0.78vw;font-weight:800;display:inline-block;
 }
 .side-text {
   font-family:var(--font-ui);
