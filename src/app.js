@@ -21,13 +21,13 @@ const firebaseConfig = await fetch('/api/config').then(r => r.json());
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-const POSTS    = 'hangul_messages';
-const USERS    = 'hangul_usernames';
-const BANS     = 'hangul_bans';
+const POSTS = 'hangul_messages';
+const USERS = 'hangul_usernames';
+const BANS = 'hangul_bans';
 const MENTIONS = 'hangul_mentions';
 
 const MOD_NAMES = new Set((firebaseConfig.moderatorProfiles || []).map(p => p.name));
-const MOD_IDS   = new Set((firebaseConfig.moderatorProfiles || []).map(p => p.id));
+const MOD_IDS = new Set((firebaseConfig.moderatorProfiles || []).map(p => p.id));
 const GOOGLE_PROVIDER = new GoogleAuthProvider();
 
 // ═══════════════════════════════════════════
@@ -106,9 +106,9 @@ termsCheck.addEventListener('change', () => {
 // ONBOARDING
 // ═══════════════════════════════════════════
 const PALETTE = [
-  '#ff2d78','#9b59ff','#00d4ff','#ff6ba6','#ffb800',
-  '#34e89e','#fc466b','#3f5efb','#f7971e','#ffd200',
-  '#d926a9','#0f3443','#e040fb','#00bcd4','#ff5722',
+  '#ff2d78', '#9b59ff', '#00d4ff', '#ff6ba6', '#ffb800',
+  '#34e89e', '#fc466b', '#3f5efb', '#f7971e', '#ffd200',
+  '#d926a9', '#0f3443', '#e040fb', '#00bcd4', '#ff5722',
 ];
 
 function randomColor() {
@@ -230,7 +230,7 @@ function listenMentions() {
   _mentionsUnsub = onSnapshot(q, snap => {
     mentionsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     updateNotifications();
-  }, () => {});
+  }, () => { });
 }
 
 const banScreen = document.getElementById('banScreen');
@@ -247,7 +247,7 @@ if (!me) {
   listenMentions();
   getDoc(doc(db, BANS, me.id)).then(snap => {
     if (snap.exists()) showBanScreen();
-  }).catch(() => {});
+  }).catch(() => { });
 }
 
 // ── Admin auth ──
@@ -288,7 +288,7 @@ onAuthStateChanged(auth, async (user) => {
         displayName: profile.name,
         createdAt: serverTimestamp()
       });
-    } catch {}
+    } catch { }
   } else if (!user && MOD_IDS.has(me?.id)) {
     // Restore previous regular user profile if one was saved before admin login
     const prevUser = localStorage.getItem(LS.PREV_USER);
@@ -315,7 +315,7 @@ function _handleAdminTap() {
   if (_adminTaps >= 5) {
     _adminTaps = 0;
     if (auth.currentUser) signOut(auth);
-    else signInWithPopup(auth, GOOGLE_PROVIDER).catch(() => {});
+    else signInWithPopup(auth, GOOGLE_PROVIDER).catch(() => { });
   }
 }
 document.querySelector('.brand').addEventListener('click', _handleAdminTap);
@@ -365,9 +365,9 @@ async function downloadMyPostsAsPDF() {
     showToast('crie um perfil para baixar posts');
     return;
   }
-  
+
   showToast('buscando seus posts…');
-  
+
   const myPosts = [];
   try {
     const q = query(collection(db, POSTS), where('authorId', '==', me.id));
@@ -396,12 +396,12 @@ async function downloadMyPostsAsPDF() {
   for (const post of myPosts) {
     const time = post.createdAt
       ? new Date(post.createdAt.seconds * 1000).toLocaleString('pt-BR', {
-          day: '2-digit', month: '2-digit', year: '2-digit',
-          hour: '2-digit', minute: '2-digit',
-        })
+        day: '2-digit', month: '2-digit', year: '2-digit',
+        hour: '2-digit', minute: '2-digit',
+      })
       : '';
     const [pg1, pg2] = post.gradient?.length === 2 ? post.gradient : [g1, g2];
-    const likes   = (post.likedBy || []).length;
+    const likes = (post.likedBy || []).length;
     const replies = post.replyCount || 0;
     const isDrawing = post.type === 'drawing';
 
@@ -471,25 +471,23 @@ async function downloadMyPostsAsPDF() {
   document.head.appendChild(styleEl);
 
   const postsHTMLScoped = postsHTML
-    .replace(/class="post-card"/g,   'class="xpost-card"')
+    .replace(/class="post-card"/g, 'class="xpost-card"')
     .replace(/class="post-header"/g, 'class="xpost-header"')
     .replace(/class="post-avatar"/g, 'class="xpost-avatar"')
     .replace(/class="post-author"/g, 'class="xpost-author"')
-    .replace(/class="post-time"/g,   'class="xpost-time"')
-    .replace(/class="post-content"/g,'class="xpost-content"')
-    .replace(/class="post-drawing"/g,'class="xpost-drawing"')
+    .replace(/class="post-time"/g, 'class="xpost-time"')
+    .replace(/class="post-content"/g, 'class="xpost-content"')
+    .replace(/class="post-drawing"/g, 'class="xpost-drawing"')
     .replace(/class="post-footer"/g, 'class="xpost-footer"')
-    .replace(/class="post-stat"/g,   'class="xpost-stat"');
+    .replace(/class="post-stat"/g, 'class="xpost-stat"');
 
   const container = document.createElement('div');
   container.id = 'pdf-export-container';
   container.innerHTML = `
     <div class="xpage">
       <div class="xbrand">
-        <div class="xbrand-logo"></div>
         <div>
           <div><span class="xbrand-w1">WEVERSE </span><span class="xbrand-w2">HANGOVER</span></div>
-          <div class="xbrand-sub">relatório de dados pessoais</div>
         </div>
       </div>
       <div class="xprofile-block">
@@ -556,7 +554,7 @@ async function deleteUserData() {
       ...postsSnap.docs.map(d => deleteDoc(d.ref)),
       ...repliesSnap.docs.map(d => deleteDoc(d.ref)),
     ]);
-    try { await deleteDoc(doc(db, USERS, me.name.toLowerCase())); } catch {}
+    try { await deleteDoc(doc(db, USERS, me.name.toLowerCase())); } catch { }
     Object.values(LS).forEach(k => localStorage.removeItem(k));
     showToast('dados deletados!');
     setTimeout(() => location.reload(), 1500);
@@ -868,10 +866,10 @@ function getPostsForTab(tab) {
   }
   const cmp = (a, b) => (b[1].createdAt?.seconds || 0) - (a[1].createdAt?.seconds || 0);
   switch (tab) {
-    case 'texts':    return all.filter(([, d]) => d.type !== 'drawing').sort(cmp);
+    case 'texts': return all.filter(([, d]) => d.type !== 'drawing').sort(cmp);
     case 'drawings': return all.filter(([, d]) => d.type === 'drawing').sort(cmp);
-    case 'mods':     return all.filter(([, d]) => MOD_NAMES.has(d.author)).sort(cmp);
-    default:         return all.sort(cmp);
+    case 'mods': return all.filter(([, d]) => MOD_NAMES.has(d.author)).sort(cmp);
+    default: return all.sort(cmp);
   }
 }
 
@@ -884,20 +882,20 @@ function updateTabCounts() {
     if (_rc >= 7 && _rc > _mc) continue;
     all.push(data);
   }
-  const texts    = all.filter(d => d.type !== 'drawing').length;
+  const texts = all.filter(d => d.type !== 'drawing').length;
   const drawings = all.filter(d => d.type === 'drawing').length;
-  const mods     = all.filter(d => MOD_NAMES.has(d.author)).length;
+  const mods = all.filter(d => MOD_NAMES.has(d.author)).length;
   const key = `${all.length}|${texts}|${drawings}|${mods}`;
   if (key === _tabCountsCache) return;
   _tabCountsCache = key;
-  const cntAll      = document.getElementById('cnt-all');
-  const cntTexts    = document.getElementById('cnt-texts');
+  const cntAll = document.getElementById('cnt-all');
+  const cntTexts = document.getElementById('cnt-texts');
   const cntDrawings = document.getElementById('cnt-drawings');
-  const cntMods     = document.getElementById('cnt-mods');
-  if (cntAll)      cntAll.textContent      = all.length;
-  if (cntTexts)    cntTexts.textContent    = texts;
+  const cntMods = document.getElementById('cnt-mods');
+  if (cntAll) cntAll.textContent = all.length;
+  if (cntTexts) cntTexts.textContent = texts;
   if (cntDrawings) cntDrawings.textContent = drawings;
-  if (cntMods)     cntMods.textContent     = mods;
+  if (cntMods) cntMods.textContent = mods;
 }
 
 // ── Feed Tabs ──
@@ -905,7 +903,7 @@ const feedTabs = document.getElementById('feedTabs');
 
 function moveIndicator(btn) {
   if (!btn || !feedTabs) return;
-  const rect     = btn.getBoundingClientRect();
+  const rect = btn.getBoundingClientRect();
   const hostRect = feedTabs.getBoundingClientRect();
   feedTabs.style.setProperty('--ind-x', (rect.left - hostRect.left + feedTabs.scrollLeft) + 'px');
   feedTabs.style.setProperty('--ind-w', rect.width + 'px');
@@ -1057,7 +1055,7 @@ async function toggleLike(id, data) {
   const current = postsMap.get(id) || data;
   const liked = (current.likedBy || []).includes(me.id);
   if (current.authorId === me.id && !liked) {
-    showConfirmToast('Alguém te ama mais do que você mesmo?', () => {}, () => _doLike(id, current, liked));
+    showConfirmToast('Alguém te ama mais do que você mesmo?', () => { }, () => _doLike(id, current, liked));
     return;
   }
   await _doLike(id, current, liked);
@@ -1066,7 +1064,7 @@ async function toggleLike(id, data) {
 async function _doLike(id, data, liked) {
   const ref = doc(db, POSTS, id);
   try {
-    const updates = { 
+    const updates = {
       likedBy: liked ? arrayRemove(me.id) : arrayUnion(me.id),
       likeCount: increment(liked ? -1 : 1)
     };
@@ -1184,7 +1182,7 @@ async function writeMentions(txt, postId, context = 'reply') {
         context,
         createdAt: serverTimestamp(),
       });
-    } catch {}
+    } catch { }
   }
 }
 
@@ -1281,7 +1279,7 @@ function renderReplyThread(id, snap) {
     });
 
     const menuBtn = item.querySelector('.post-menu-btn');
-    const menuEl  = item.querySelector('.post-menu');
+    const menuEl = item.querySelector('.post-menu');
     menuBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       const isOpen = menuEl.classList.contains('open');
@@ -1325,7 +1323,7 @@ async function toggleReplyLike(postId, replyId, data) {
   if (!me) return openOnboarding();
   const liked = (data.likedBy || []).includes(me.id);
   if (data.authorId === me.id && !liked) {
-    showConfirmToast('Alguém te ama mais do que você mesmo?', () => {}, () => _doReplyLike(postId, replyId, data, liked));
+    showConfirmToast('Alguém te ama mais do que você mesmo?', () => { }, () => _doReplyLike(postId, replyId, data, liked));
     return;
   }
   await _doReplyLike(postId, replyId, data, liked);
@@ -1580,11 +1578,11 @@ function renderTrending() {
   feed.querySelector('.tab-empty')?.remove();
   loadSentinel.remove();
 
-  const likedPosts = Array.from(topLikedPostsData.entries()).sort((a,b) => (b[1].likeCount||0) - (a[1].likeCount||0)).slice(0, 10);
-  const commentedPosts = Array.from(topCommentedPostsData.entries()).sort((a,b) => (b[1].replyCount||0) - (a[1].replyCount||0)).slice(0, 10);
+  const likedPosts = Array.from(topLikedPostsData.entries()).sort((a, b) => (b[1].likeCount || 0) - (a[1].likeCount || 0)).slice(0, 10);
+  const commentedPosts = Array.from(topCommentedPostsData.entries()).sort((a, b) => (b[1].replyCount || 0) - (a[1].replyCount || 0)).slice(0, 10);
 
   // ── Liked section ──────────────────────────────────────────
-  let likedStrip   = feed.querySelector('.rank-strip--liked');
+  let likedStrip = feed.querySelector('.rank-strip--liked');
   let likedSection = feed.querySelector('.trending-section--liked');
   if (!likedStrip) {
     likedStrip = document.createElement('div');
@@ -1605,7 +1603,7 @@ function renderTrending() {
   });
 
   // ── Commented section ──────────────────────────────────────
-  let commentedStrip   = feed.querySelector('.rank-strip--commented');
+  let commentedStrip = feed.querySelector('.rank-strip--commented');
   let commentedSection = feed.querySelector('.trending-section--commented');
   if (!commentedStrip) {
     commentedStrip = document.createElement('div');
@@ -1637,8 +1635,8 @@ function renderTrending() {
 // ═══════════════════════════════════════════
 // SEARCH
 // ═══════════════════════════════════════════
-const searchBtn       = document.getElementById('searchBtn');
-const feedSearchBar   = document.getElementById('feedSearchBar');
+const searchBtn = document.getElementById('searchBtn');
+const feedSearchBar = document.getElementById('feedSearchBar');
 const feedSearchInput = document.getElementById('feedSearchInput');
 const feedSearchClose = document.getElementById('feedSearchClose');
 
@@ -2037,7 +2035,7 @@ function closeNotifDrawer() {
 }
 
 function nameGradient(name) {
-  const palette = ['#ff2d78','#9b59ff','#00d4ff','#ff6ba6','#ffb800','#34e89e','#fc466b','#3f5efb','#d926a9'];
+  const palette = ['#ff2d78', '#9b59ff', '#00d4ff', '#ff6ba6', '#ffb800', '#34e89e', '#fc466b', '#3f5efb', '#d926a9'];
   let h = 0;
   for (const c of (name || '?')) h = (h * 31 + c.charCodeAt(0)) & 0xffff;
   const i = h % palette.length;
@@ -2050,28 +2048,28 @@ function renderNotifList() {
   const own = ownPosts();
   const items = [];
 
-  const heartSVG   = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
-  const chatSVG    = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`;
-  const alertSVG   = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`;
-  const checkSVG   = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
+  const heartSVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+  const chatSVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`;
+  const alertSVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`;
+  const checkSVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
   const mentionSVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/></svg>`;
-  const drawSVG    = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z"/><path d="M9 8c-2 3-4 3.5-7 4l8 10c2-1 6-5 6-7"/></svg>`;
+  const drawSVG = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z"/><path d="M9 8c-2 3-4 3.5-7 4l8 10c2-1 6-5 6-7"/></svg>`;
 
   own.forEach(([id, data]) => {
     const base = notifBaseline[id] || { likes: 0, replies: 0, reportNotified: 0, maintainNotified: 0 };
-    const likes         = othersLikes(data);
-    const replies       = data.replyCount || 0;
-    const reportCount   = data.reportedBy?.length || 0;
+    const likes = othersLikes(data);
+    const replies = data.replyCount || 0;
+    const reportCount = data.reportedBy?.length || 0;
     const maintainCount = data.maintainedCount || 0;
-    const postDate      = data.createdAt?.seconds || 0;
-    const isDrawing     = data.type === 'drawing';
-    const drawingSrc    = isDrawing && typeof data.message === 'string' && /^data:image\/(png|jpeg|gif|webp);base64,/.test(data.message) ? data.message : '';
+    const postDate = data.createdAt?.seconds || 0;
+    const isDrawing = data.type === 'drawing';
+    const drawingSrc = isDrawing && typeof data.message === 'string' && /^data:image\/(png|jpeg|gif|webp);base64,/.test(data.message) ? data.message : '';
     const postPreviewText = isDrawing ? '' : (data.message || '').slice(0, 100);
 
     if (likes > 0) {
-      const hasNew  = likes > (base.likes || 0);
-      const liker   = data.lastLikerName || 'alguém';
-      const extra   = likes - 1;
+      const hasNew = likes > (base.likes || 0);
+      const liker = data.lastLikerName || 'alguém';
+      const extra = likes - 1;
       const textHTML = extra > 0
         ? `<strong>${escapeHTML(liker)}</strong> +${extra} curtiram seu post.`
         : `<strong>${escapeHTML(liker)}</strong> curtiu seu post.`;
@@ -2084,10 +2082,10 @@ function renderNotifList() {
     }
 
     if (replies > 0) {
-      const hasNew      = replies > (base.replies || 0);
-      const author      = data.lastReplyAuthor || 'alguém';
+      const hasNew = replies > (base.replies || 0);
+      const author = data.lastReplyAuthor || 'alguém';
       const uniqueCount = data.replyUniqueAuthors?.length || 1;
-      const extra       = uniqueCount - 1;
+      const extra = uniqueCount - 1;
       const textHTML = extra > 0
         ? `<strong>${escapeHTML(author)}</strong> e mais ${extra} ${extra === 1 ? 'pessoa comentaram' : 'pessoas comentaram'} no seu post.`
         : `<strong>${escapeHTML(author)}</strong> comentou no seu post.`;
@@ -2347,7 +2345,7 @@ function renderLightboxThread(threadEl, snap) {
 function wireLightboxComposer(composerEl, postId) {
   if (!me) return;
   composerEl.classList.remove('hidden');
-  const input   = composerEl.querySelector('.lightbox-reply-input');
+  const input = composerEl.querySelector('.lightbox-reply-input');
   const sendBtn = composerEl.querySelector('.lightbox-reply-send');
   input.addEventListener('input', () => {
     sendBtn.disabled = input.value.trim().length === 0;
