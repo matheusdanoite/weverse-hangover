@@ -67,7 +67,7 @@ export async function onRequestPost(context) {
           },
           webpush: {
             fcm_options: {
-              link: "https://hangul.pages.dev/adm/"
+              link: "https://weverse-hangover.pages.dev/adm/"
             }
           }
         }

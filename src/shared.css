@@ -87,7 +87,7 @@ input, textarea { font-family: var(--font-main); }
   flex-wrap: wrap;
 }
 
-.post-author  { font-weight: 700; color: var(--text-primary); font-size: 0.9rem; }
+.post-author  { font-weight: 700; color: var(--text-primary); font-size: 0.9rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .post-time    { font-size: 0.72rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
 .post-mine-tag {
@@ -224,6 +224,10 @@ input, textarea { font-family: var(--font-main); }
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-primary);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .lightbox-actions {
@@ -423,7 +427,7 @@ input, textarea { font-family: var(--font-main); }
   margin-bottom: 2px; flex-wrap: wrap;
 }
 
-.reply-author  { font-weight: 700; font-size: 0.82rem; color: var(--text-primary); }
+.reply-author  { font-weight: 700; font-size: 0.82rem; color: var(--text-primary); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .reply-time    { font-size: 0.68rem; color: var(--text-muted); }
 
 .reply-content {

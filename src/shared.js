@@ -94,7 +94,9 @@ document.addEventListener('click', e => {
 });
 
 export function gradientCSS(g) {
-  if (!g || g.length !== 2) return 'linear-gradient(to bottom right, #ff2d78 0%, #9b59ff 100%)';
+  const isHex = c => typeof c === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(c);
+  if (!g || g.length !== 2 || !isHex(g[0]) || !isHex(g[1]))
+    return 'linear-gradient(to bottom right, #ff2d78 0%, #9b59ff 100%)';
   return `linear-gradient(to bottom right, ${g[0]} 0%, ${g[1]} 100%)`;
 }
 

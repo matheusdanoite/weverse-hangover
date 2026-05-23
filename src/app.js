@@ -161,7 +161,7 @@ onboardName.addEventListener('input', () => {
 onboardSubmit.addEventListener('click', async () => {
   if (!termsCheck.checked) return;
   const name = onboardName.value.trim();
-  if (!name) {
+  if (name.length < 2) {
     onboardName.focus();
     onboardName.style.borderColor = 'var(--pink-neon)';
     onboardName.style.boxShadow = '0 0 0 3px var(--pink-glow)';
@@ -1011,7 +1011,8 @@ function buildDrawingTile(id, data) {
   const el = document.createElement('div');
   el.className = 'drawing-tile';
   el.dataset.id = id;
-  el.innerHTML = `<img class="post-drawing tile-img" src="${data.message || ''}" alt="desenho" loading="lazy" />`;
+  const tileSrc = typeof data.message === 'string' && /^data:image\/(png|jpeg|gif|webp);base64,/.test(data.message) ? data.message : '';
+  el.innerHTML = `<img class="post-drawing tile-img" src="${tileSrc}" alt="desenho" loading="lazy" />`;
   seenObserver.observe(el);
   visibilityObserver.observe(el);
   return el;
@@ -1974,7 +1975,7 @@ function renderNotifList() {
     const maintainCount = data.maintainedCount || 0;
     const postDate      = data.createdAt?.seconds || 0;
     const isDrawing     = data.type === 'drawing';
-    const drawingSrc    = isDrawing ? (data.message || '') : '';
+    const drawingSrc    = isDrawing && typeof data.message === 'string' && /^data:image\/(png|jpeg|gif|webp);base64,/.test(data.message) ? data.message : '';
     const postPreviewText = isDrawing ? '' : (data.message || '').slice(0, 100);
 
     if (likes > 0) {
