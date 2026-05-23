@@ -163,11 +163,16 @@ function processNewPostQueue() {
   container.appendChild(card);
 
   requestAnimationFrame(() => {
+    overlay.classList.add('backdrop-active');
     overlay.classList.add('active');
 
     setTimeout(() => {
       overlay.classList.remove('active');
       overlay.classList.add('exit');
+
+      if (newPostsQueue.length === 0) {
+        overlay.classList.remove('backdrop-active');
+      }
 
       setTimeout(() => {
         overlay.classList.remove('exit');

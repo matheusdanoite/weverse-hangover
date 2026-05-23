@@ -456,7 +456,8 @@ body {
   transition: opacity 0.8s ease;
 }
 
-.new-post-overlay.active .new-post-backdrop {
+.new-post-overlay.active .new-post-backdrop,
+.new-post-overlay.backdrop-active .new-post-backdrop {
   opacity: 1;
 }
 
