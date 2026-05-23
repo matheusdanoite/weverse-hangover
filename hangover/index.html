@@ -2,10 +2,15 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0a0010" />
+  <meta name="robots" content="noindex, nofollow" />
   <link rel="icon" type="image/png" href="/icon.png" />
   <link rel="apple-touch-icon" href="/icon.png" />
-  <title>Weverse Hangover</title>
+  <title>Weverse Hangover — Live Board</title>
   <meta name="description" content="Mural ao vivo da Hangul Hangover" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -15,15 +20,25 @@
 <body>
   <div class="kinetic-bg tint-default" id="kineticBg"></div>
 
-  <header class="board-header">
+  <header class="board-header" id="boardHeader">
     <div class="header-left">
-      <span class="live-dot-hd"></span>
+      <span class="live-dot"></span>
       <div class="wordmark">
         <span class="wm-weverse">WEVERSE</span>
         <span class="wm-hangover">HANGOVER</span>
       </div>
     </div>
     <div class="header-right">
+      <div class="stats-bar" id="statsBar">
+        <span class="stat-chip" id="statPosts">
+          <span class="stat-val">0</span>
+          <span class="stat-label">posts</span>
+        </span>
+        <span class="stat-chip" id="statLikes">
+          <span class="stat-val">0</span>
+          <span class="stat-label">curtidas</span>
+        </span>
+      </div>
     </div>
   </header>
 
@@ -31,11 +46,11 @@
     <div class="view-label-text" id="viewLabelText"></div>
   </div>
 
-  <main class="board-scene" id="boardGrid"></main>
+  <main class="board-scene" id="boardScene"></main>
 
-  <div class="empty-state" id="emptyState">
-    <div class="empty-icon">✦</div>
-    <p>aguardando o primeiro post...</p>
+  <div class="empty-state hidden" id="emptyState">
+    <div class="empty-glyph">✦</div>
+    <p class="empty-title">aguardando o primeiro post...</p>
     <p class="empty-sub">acesse e poste algo</p>
   </div>
 

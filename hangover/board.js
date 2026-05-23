@@ -1,8 +1,3 @@
-// ═══════════════════════════════════════════
-// WEVERSE HANGOVER — Kinetic VJ Board
-// Rotação: curtidos → recentes → comentados → bombando → nudge
-// ═══════════════════════════════════════════
-
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js';
 import {
   getFirestore, collection, query, orderBy, limit, onSnapshot
@@ -14,51 +9,46 @@ const db  = getFirestore(app);
 const MOD_NAMES = new Set((firebaseConfig.moderatorProfiles || []).map(p => p.name));
 const POSTS = 'hangul_messages';
 
-// ── DOM ──
 const kineticBg      = document.getElementById('kineticBg');
-const boardScene     = document.getElementById('boardGrid');
+const boardScene     = document.getElementById('boardScene');
 const emptyState     = document.getElementById('emptyState');
 const viewLabelWrap  = document.getElementById('viewLabelWrap');
 const viewLabelText  = document.getElementById('viewLabelText');
-// ── Data store ──
+const statPostsVal   = document.querySelector('#statPosts .stat-val');
+const statLikesVal   = document.querySelector('#statLikes .stat-val');
+
 const allPosts    = new Map();
 const replyUnsubs = new Map();
 
-// ── View rotation ──
-const VIEWS     = ['curtidos', 'recentes', 'comentados', 'bombando', 'nudge'];
-const DURATIONS = { curtidos: 14000, recentes: 14000, comentados: 18000, bombando: 16000, nudge: 15000 };
+const VIEWS     = ['trending', 'agora', 'thread', 'descobertas', 'participe'];
+const DURATIONS = { trending: 14000, agora: 12000, thread: 18000, descobertas: 14000, participe: 12000 };
 
 const VIEW_CFG = {
-  curtidos:  { label: 'MAIS CURTIDOS', tint: 'default' },
-  recentes:  { label: 'AGORA',         tint: 'hot'     },
-  comentados:{ label: 'COMENTE',       tint: 'cool'    },
-  bombando:  { label: 'E TEM MAIS…',   tint: 'default' },
-  nudge:     { label: '',              tint: 'hot'     },
-  breaking:  { label: '',              tint: 'hot'     },
+  trending:    { label: 'TRENDING',       tint: 'default' },
+  agora:       { label: 'AGORA',          tint: 'hot'     },
+  thread:      { label: 'THREAD EM FOCO', tint: 'cool'    },
+  descobertas: { label: 'DESCOBERTAS',    tint: 'default' },
+  participe:   { label: '',               tint: 'hot'     },
+  breaking:    { label: '',               tint: 'hot'     },
 };
 
 let viewIndex         = 0;
 let viewTimer         = null;
-let curtidosOffset    = 0;
-let curtidosLastIds   = '';
-let curtidosSameCount = 0;
-let comentadosIndex   = 0;
+let trendingOffset    = 0;
+let trendingLastIds   = '';
+let trendingSameCount = 0;
+let threadIndex       = 0;
 const olhoShown       = new Set();
 let isBreaking        = false;
 let breakingTimer     = null;
 let isReady           = false;
 let isPaused          = false;
 
-const BOMBANDO_BADGES = ['AINDA SEM SER VISTO', 'SÓ UM CURTIDO', 'MERECE MAIS', 'PASSOU BATIDO'];
+const DESCOBERTAS_BADGES = ['AINDA SEM SER VISTO', 'SÓ UM CURTIDO', 'MERECE MAIS', 'PASSOU BATIDO'];
 
 const DRAWING_RE = /^data:image\/(png|jpeg|gif|webp);base64,/;
 function isDrawing(d) { return d.type === 'drawing' && typeof d.message === 'string' && DRAWING_RE.test(d.message); }
 
-// ── Viewport scale helpers (referência 1024×768) ──
-const vw = px => Math.round(window.innerWidth  * px / 1024);
-const vh = px => Math.round(window.innerHeight * px / 768);
-
-// ── Helpers ──
 function gradientCSS(g) {
   if (!g || g.length < 2) return 'linear-gradient(135deg,#ff2d78,#9b59ff)';
   return `linear-gradient(135deg,${g[0]},${g[1]})`;
@@ -84,7 +74,14 @@ function formatTime(ts) {
 function likesOf(data)   { return (data.likedBy || []).length; }
 function repliesOf(data) { return data.replyCount || 0; }
 
-// ── Author chip builder ──
+function chipSize(kind) {
+  const w = window.innerWidth;
+  if (kind === 'hero')  return Math.round(Math.min(Math.max(w * 0.06, 40), 80));
+  if (kind === 'side')  return Math.round(Math.min(Math.max(w * 0.038, 28), 52));
+  if (kind === 'reply') return Math.round(Math.min(Math.max(w * 0.024, 20), 32));
+  return Math.round(Math.min(Math.max(w * 0.05, 32), 64));
+}
+
 function buildAuthorChip(author, gradient, size, isMod) {
   const initial = (author || '?').charAt(0).toUpperCase();
   const wrap = document.createElement('div');
@@ -105,19 +102,16 @@ function buildAuthorChip(author, gradient, size, isMod) {
 
 const SVG_REPLIES = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width:1em;height:1em;vertical-align:middle;"><path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v7a2 2 0 01-2 2H7l-4 4V5z"/></svg>`;
 
-function fitText(el, maxVw, minVw) {
+function fitText(el, maxPx, minPx) {
   if (el.querySelector('img')) return;
-  const W = window.innerWidth;
-  let size = maxVw * W / 100;
-  const min = minVw * W / 100;
+  let size = maxPx;
   el.style.fontSize = size + 'px';
-  while (size > min && el.scrollHeight > el.clientHeight) {
+  while (size > minPx && el.scrollHeight > el.clientHeight) {
     size -= 2;
     el.style.fontSize = size + 'px';
   }
 }
 
-// ── Big count ──
 function buildBigCount(value, icon, color) {
   const el = document.createElement('div');
   el.className = 'big-count';
@@ -128,12 +122,19 @@ function buildBigCount(value, icon, color) {
   return el;
 }
 
-// ── View switcher ──
+function updateStats() {
+  const totalPosts = allPosts.size;
+  let totalLikes = 0;
+  allPosts.forEach(e => { totalLikes += likesOf(e.data); });
+  if (statPostsVal) statPostsVal.textContent = totalPosts;
+  if (statLikesVal) statLikesVal.textContent = totalLikes;
+}
+
 function applyView(view) {
-  const cfg = VIEW_CFG[view] || VIEW_CFG.curtidos;
+  const cfg = VIEW_CFG[view] || VIEW_CFG.trending;
   kineticBg.className = `kinetic-bg tint-${cfg.tint}`;
 
-  const hideLabel = view === 'nudge' || view === 'breaking';
+  const hideLabel = view === 'participe' || view === 'breaking';
   viewLabelWrap.classList.toggle('label-hidden', hideLabel);
   boardScene.classList.toggle('no-label', hideLabel);
 
@@ -142,7 +143,6 @@ function applyView(view) {
   }
 }
 
-// ── Reply subscriptions ──
 function ensureReplies(id) {
   if (replyUnsubs.has(id)) return;
   const q = query(
@@ -163,7 +163,6 @@ function pruneReplies(keepIds) {
   });
 }
 
-// ── Firestore listener ──
 const postsQ = query(collection(db, POSTS), orderBy('createdAt', 'desc'), limit(80));
 
 onSnapshot(postsQ, snap => {
@@ -174,6 +173,7 @@ onSnapshot(postsQ, snap => {
     clearTimeout(viewTimer);
     clearTimeout(breakingTimer);
     isReady = false; isBreaking = false;
+    updateStats();
     return;
   }
   emptyState.classList.add('hidden');
@@ -201,6 +201,8 @@ onSnapshot(postsQ, snap => {
   topCommented.forEach(p => ensureReplies(p.id));
   pruneReplies(keepIds);
 
+  updateStats();
+
   if (!isReady) {
     isReady = true;
     startViews();
@@ -212,7 +214,6 @@ onSnapshot(postsQ, snap => {
   }
 });
 
-// ── View controller ──
 function startViews() {
   renderCurrentView();
   scheduleNext();
@@ -232,11 +233,11 @@ function renderCurrentView() {
   const view = VIEWS[viewIndex];
   applyView(view);
   transitionTo(() => {
-    if      (view === 'curtidos')   renderCurtidos();
-    else if (view === 'recentes')   renderRecentes();
-    else if (view === 'comentados') renderComentados();
-    else if (view === 'bombando')   renderBombando();
-    else                            renderNudge();
+    if      (view === 'trending')    renderTrending();
+    else if (view === 'agora')       renderAgora();
+    else if (view === 'thread')      renderThread();
+    else if (view === 'descobertas') renderDescobertas();
+    else                             renderParticipe();
   });
 }
 
@@ -249,7 +250,6 @@ function transitionTo(fn) {
   }, 440);
 }
 
-// ── Breaking news interrupt ──
 function showBreakingNews(post) {
   if (!post) return;
   isBreaking = true;
@@ -273,36 +273,35 @@ function showBreakingNews(post) {
 }
 
 // ════════════════════════════════════════
-// RENDER: MAIS CURTIDOS
+// RENDER: TRENDING
 // ════════════════════════════════════════
-function renderCurtidos() {
+function renderTrending() {
   const sorted = [...allPosts.values()]
     .filter(p => likesOf(p.data) > 0)
     .sort((a, b) => likesOf(b.data) - likesOf(a.data));
 
-  if (!sorted.length) { renderRecentes(); return; }
+  if (!sorted.length) { renderAgora(); return; }
 
-  const slice = sorted.slice(curtidosOffset, curtidosOffset + 3);
+  const slice = sorted.slice(trendingOffset, trendingOffset + 3);
   const ids   = slice.map(p => p.id).join(',');
-  if (ids === curtidosLastIds) {
-    curtidosSameCount++;
-    if (curtidosSameCount >= 2) {
-      const next = curtidosOffset + 3;
-      curtidosOffset    = (next < 9 && sorted.length > next) ? next : 0;
-      curtidosSameCount = 0;
+  if (ids === trendingLastIds) {
+    trendingSameCount++;
+    if (trendingSameCount >= 2) {
+      const next = trendingOffset + 3;
+      trendingOffset    = (next < 9 && sorted.length > next) ? next : 0;
+      trendingSameCount = 0;
     }
   } else {
-    curtidosLastIds   = ids;
-    curtidosSameCount = 1;
+    trendingLastIds   = ids;
+    trendingSameCount = 1;
   }
 
-  const posts    = sorted.slice(curtidosOffset, curtidosOffset + 3);
-  const rankBase = curtidosOffset + 1;
+  const posts    = sorted.slice(trendingOffset, trendingOffset + 3);
+  const rankBase = trendingOffset + 1;
   if (!posts.length) return;
 
-  boardScene.className = 'board-scene view-curtidos scene-enter';
+  boardScene.className = 'board-scene view-trending scene-enter';
 
-  // ── Hero card ──
   const hero = posts[0];
   const heroData = hero.data;
   const heroLikes = likesOf(heroData);
@@ -311,7 +310,6 @@ function renderCurtidos() {
 
   const heroCard = document.createElement('article');
   heroCard.className = 'hero-card';
-  heroCard.dataset.postId = hero.id;
 
   const heroRankEl = document.createElement('div');
   heroRankEl.className = 'hero-rank';
@@ -323,7 +321,7 @@ function renderCurtidos() {
   if (isDrawing(heroData)) {
     const img = document.createElement('img');
     img.src = heroData.message; img.alt = 'desenho';
-    img.style.cssText = `max-width:100%;height:100%;object-fit:contain;border-radius:8px;background:#fff;display:block;`;
+    img.style.cssText = 'max-width:100%;height:100%;object-fit:contain;border-radius:8px;background:#fff;display:block;';
     textEl.appendChild(img);
     if (heroData.caption) {
       const cap = document.createElement('div');
@@ -338,7 +336,7 @@ function renderCurtidos() {
 
   const footer = document.createElement('div');
   footer.className = 'hero-footer';
-  footer.appendChild(buildAuthorChip(heroData.author, heroData.gradient, vw(72), heroMod));
+  footer.appendChild(buildAuthorChip(heroData.author, heroData.gradient, chipSize('hero'), heroMod));
   const authorInfo = document.createElement('div');
   authorInfo.className = 'hero-author-info';
   authorInfo.innerHTML = `<div class="hero-author-name">@${escapeHTML(heroData.author || 'anônimo')}</div>`;
@@ -351,9 +349,8 @@ function renderCurtidos() {
   heroCard.appendChild(footer);
   boardScene.appendChild(heroCard);
 
-  // ── Side cards (#2 and #3) ──
   const rightCol = document.createElement('div');
-  rightCol.className = 'curtidos-right';
+  rightCol.className = 'trending-right';
 
   for (let i = 1; i <= 2; i++) {
     if (!posts[i]) continue;
@@ -365,7 +362,6 @@ function renderCurtidos() {
 
     const card = document.createElement('article');
     card.className = 'side-card';
-    card.dataset.postId = p.id;
     card.style.animationDelay = `${i * 0.12}s`;
 
     const rank = document.createElement('div');
@@ -378,7 +374,7 @@ function renderCurtidos() {
     if (isDrawing(pd)) {
       const img = document.createElement('img');
       img.src = pd.message; img.alt = 'desenho';
-      img.style.cssText = `max-width:100%;height:100%;object-fit:contain;border-radius:4px;background:#fff;display:block;`;
+      img.style.cssText = 'max-width:100%;height:100%;object-fit:contain;border-radius:4px;background:#fff;display:block;';
       sideText.appendChild(img);
       if (pd.caption) {
         const cap = document.createElement('div');
@@ -393,7 +389,7 @@ function renderCurtidos() {
 
     const sideFooter = document.createElement('div');
     sideFooter.className = 'side-footer';
-    sideFooter.appendChild(buildAuthorChip(pd.author, pd.gradient, vw(44), pMod));
+    sideFooter.appendChild(buildAuthorChip(pd.author, pd.gradient, chipSize('side'), pMod));
     const sName = document.createElement('div');
     sName.className = 'side-author-name';
     sName.textContent = '@' + (pd.author || 'anônimo');
@@ -409,33 +405,37 @@ function renderCurtidos() {
   boardScene.appendChild(rightCol);
 
   requestAnimationFrame(() => {
+    const w = window.innerWidth;
     const ht = boardScene.querySelector('.hero-text');
-    if (ht) fitText(ht, 8, 1.8);
-    boardScene.querySelectorAll('.side-text').forEach(el => fitText(el, 4, 1.2));
+    if (ht) fitText(ht, Math.round(w * 0.055), Math.round(w * 0.018));
+    boardScene.querySelectorAll('.side-text').forEach(el =>
+      fitText(el, Math.round(w * 0.035), Math.round(w * 0.012))
+    );
   });
 }
 
 // ════════════════════════════════════════
-// RENDER: RECENTES (breaking layout, most recent post)
+// RENDER: AGORA (most recent)
 // ════════════════════════════════════════
-function renderRecentes() {
+function renderAgora() {
   const sorted = [...allPosts.values()]
     .sort((a, b) => (b.data.createdAt?.seconds || 0) - (a.data.createdAt?.seconds || 0));
 
   if (!sorted.length) return;
   const post = sorted[0];
-  const timeStr = `POSTADO ${formatTime(post.data.createdAt)}`.toUpperCase();
-  renderBreakingCard(post, timeStr === 'POSTADO AGORA' ? 'CHEGOU AGORA MESMO' : `POSTADO HÁ ${formatTime(post.data.createdAt).toUpperCase()}`);
+  const timeStr = formatTime(post.data.createdAt);
+  const label = timeStr === 'agora' ? 'CHEGOU AGORA MESMO' : `POSTADO HÁ ${timeStr.toUpperCase()}`;
+  renderBreakingCard(post, label);
 }
 
 // ════════════════════════════════════════
 // SHARED: breaking card layout
 // ════════════════════════════════════════
 function renderBreakingCard(post, timeStr) {
-  boardScene.className = `board-scene view-breaking no-label scene-enter`;
+  boardScene.className = 'board-scene view-agora no-label scene-enter';
 
   const ghost = document.createElement('div');
-  ghost.className = 'breaking-novo';
+  ghost.className = 'breaking-ghost';
   ghost.textContent = 'NOVO';
   boardScene.appendChild(ghost);
 
@@ -455,7 +455,7 @@ function renderBreakingCard(post, timeStr) {
 
   const hdr = document.createElement('div');
   hdr.className = 'breaking-card-header';
-  hdr.appendChild(buildAuthorChip(d.author, d.gradient, vw(84), isMod));
+  hdr.appendChild(buildAuthorChip(d.author, d.gradient, chipSize('hero'), isMod));
   const aInfo = document.createElement('div');
   aInfo.innerHTML = `
     <div class="breaking-author-name">@${escapeHTML(d.author || 'anônimo')}</div>
@@ -486,44 +486,43 @@ function renderBreakingCard(post, timeStr) {
 }
 
 // ════════════════════════════════════════
-// RENDER: COMENTADOS
+// RENDER: THREAD (comentados)
 // ════════════════════════════════════════
-function renderComentados() {
+function renderThread() {
   const sorted = [...allPosts.values()]
     .sort((a, b) => repliesOf(b.data) - repliesOf(a.data))
     .filter(p => repliesOf(p.data) > 0)
     .slice(0, 5);
 
-  if (!sorted.length) { renderRecentes(); return; }
+  if (!sorted.length) { renderAgora(); return; }
 
-  const idx  = comentadosIndex % sorted.length;
+  const idx  = threadIndex % sorted.length;
   const post = sorted[idx];
-  comentadosIndex = (comentadosIndex + 1) % sorted.length;
+  threadIndex = (threadIndex + 1) % sorted.length;
 
-  boardScene.className = 'board-scene view-comentados scene-enter';
+  boardScene.className = 'board-scene view-thread scene-enter';
 
   const d = post.data;
   const isMod = MOD_NAMES.has(d.author);
   const lk = likesOf(d);
   const rc = repliesOf(d);
 
-  // ── Left: original post ──
   const postCard = document.createElement('article');
-  postCard.className = 'comentados-post';
+  postCard.className = 'thread-post';
 
   const topRow = document.createElement('div');
   topRow.innerHTML = `
-    <span class="comentados-label">O POST</span>
-    <span class="comentados-timestamp">${formatTime(d.createdAt)}</span>
+    <span class="thread-label">O POST</span>
+    <span class="thread-timestamp">${formatTime(d.createdAt)}</span>
   `;
   postCard.appendChild(topRow);
 
   const textEl = document.createElement('div');
-  textEl.className = 'comentados-text';
+  textEl.className = 'thread-text';
   if (isDrawing(d)) {
     const img = document.createElement('img');
     img.src = d.message; img.alt = 'desenho';
-    img.style.cssText = `max-width:100%;max-height:${vh(180)}px;object-fit:contain;border-radius:8px;background:#fff;`;
+    img.style.cssText = `max-width:100%;max-height:40%;object-fit:contain;border-radius:8px;background:#fff;`;
     textEl.appendChild(img);
     if (d.caption) {
       const cap = document.createElement('div');
@@ -537,35 +536,37 @@ function renderComentados() {
   postCard.appendChild(textEl);
 
   const postFooter = document.createElement('div');
-  postFooter.className = 'comentados-post-footer';
-  postFooter.appendChild(buildAuthorChip(d.author, d.gradient, vw(64), isMod));
+  postFooter.className = 'thread-post-footer';
+  postFooter.appendChild(buildAuthorChip(d.author, d.gradient, chipSize('default'), isMod));
   const pName = document.createElement('div');
-  pName.className = 'comentados-post-author';
+  pName.className = 'thread-post-author';
   pName.textContent = '@' + (d.author || 'anônimo');
   postFooter.appendChild(pName);
+
+  const w = window.innerWidth;
+  const cntSize = Math.round(Math.min(Math.max(w * 0.022, 14), 26));
   const pCounts = document.createElement('div');
-  pCounts.className = 'comentados-post-counts';
+  pCounts.className = 'thread-post-counts';
   pCounts.innerHTML = `
-    <span style="color:var(--pink-lt);font-size:${vw(28)}px;font-family:var(--font-mono);font-weight:800;">♥${lk}</span>
-    <span style="color:var(--cyan);font-size:${vw(28)}px;font-family:var(--font-mono);font-weight:800;">${SVG_REPLIES}${rc}</span>
+    <span style="color:var(--pink-lt);font-size:${cntSize}px;font-family:var(--font-mono);font-weight:800;">♥${lk}</span>
+    <span style="color:var(--cyan);font-size:${cntSize}px;font-family:var(--font-mono);font-weight:800;">${SVG_REPLIES}${rc}</span>
   `;
   postFooter.appendChild(pCounts);
   postCard.appendChild(postFooter);
   boardScene.appendChild(postCard);
 
-  // ── Right: replies ──
   const repliesCol = document.createElement('div');
-  repliesCol.className = 'comentados-replies';
+  repliesCol.className = 'thread-replies';
 
   const repliesHdr = document.createElement('div');
-  repliesHdr.className = 'comentados-replies-header';
+  repliesHdr.className = 'thread-replies-header';
   repliesHdr.textContent = '▼ ÚLTIMAS RESPOSTAS';
   repliesCol.appendChild(repliesHdr);
 
   const replies = post.replies || [];
   if (!replies.length) {
     const empty = document.createElement('div');
-    empty.style.cssText = `color:var(--text-muted);font-size:${vw(14)}px;letter-spacing:2px;padding:${vh(20)}px 0;font-family:var(--font-mono);`;
+    empty.style.cssText = `color:var(--text-muted);font-size:clamp(0.6rem,1.1vw,1rem);letter-spacing:0.1em;padding:16px 0;font-family:var(--font-mono);`;
     empty.textContent = 'carregando respostas…';
     repliesCol.appendChild(empty);
   } else {
@@ -576,7 +577,7 @@ function renderComentados() {
 
       const bHdr = document.createElement('div');
       bHdr.className = 'reply-bubble-header';
-      bHdr.appendChild(buildAuthorChip(r.author, r.gradient, vw(28), MOD_NAMES.has(r.author)));
+      bHdr.appendChild(buildAuthorChip(r.author, r.gradient, chipSize('reply'), MOD_NAMES.has(r.author)));
       const bMeta = document.createElement('span');
       bMeta.className = 'reply-bubble-author';
       bMeta.textContent = '@' + (r.author || 'anônimo');
@@ -590,7 +591,7 @@ function renderComentados() {
       if (isDrawing(r)) {
         const img = document.createElement('img');
         img.src = r.message; img.alt = 'desenho';
-        img.style.cssText = `max-height:${vh(44)}px;object-fit:contain;border-radius:4px;background:#fff;`;
+        img.style.cssText = `max-height:clamp(32px,5vh,56px);object-fit:contain;border-radius:4px;background:#fff;`;
         bubble.appendChild(img);
       } else {
         const bText = document.createElement('div');
@@ -604,8 +605,8 @@ function renderComentados() {
 
   if (rc > 5) {
     const more = document.createElement('div');
-    more.className = 'comentados-more';
-    more.innerHTML = `<span>+${rc - 5} outras respostas</span><span class="comentados-more-line"></span><span>→</span>`;
+    more.className = 'thread-more';
+    more.innerHTML = `<span>+${rc - 5} outras respostas</span><span class="thread-more-line"></span><span>→</span>`;
     repliesCol.appendChild(more);
   }
 
@@ -613,9 +614,9 @@ function renderComentados() {
 }
 
 // ════════════════════════════════════════
-// RENDER: E TEM MAIS (bombando / underdogs)
+// RENDER: DESCOBERTAS (underdogs)
 // ════════════════════════════════════════
-function getBombandoPosts() {
+function getDescovertasPosts() {
   const topLikesIds = new Set(
     [...allPosts.values()]
       .sort((a, b) => likesOf(b.data) - likesOf(a.data))
@@ -636,9 +637,9 @@ function getBombandoPosts() {
   );
 }
 
-function renderBombando() {
-  const eligible = getBombandoPosts();
-  if (!eligible.length) { renderCurtidos(); return; }
+function renderDescobertas() {
+  const eligible = getDescovertasPosts();
+  if (!eligible.length) { renderTrending(); return; }
 
   let unseen = eligible.filter(p => !olhoShown.has(p.id));
   if (!unseen.length) { olhoShown.clear(); unseen = eligible; }
@@ -647,68 +648,74 @@ function renderBombando() {
   const toShow = unseen.slice(0, 4);
   toShow.forEach(p => olhoShown.add(p.id));
 
-  boardScene.className = 'board-scene view-bombando scene-enter';
+  boardScene.className = 'board-scene view-descobertas scene-enter';
+
+  const w = window.innerWidth;
+  const countSize = Math.round(Math.min(Math.max(w * 0.016, 12), 20));
 
   toShow.forEach((post, i) => {
     const d = post.data;
     const isMod = MOD_NAMES.has(d.author);
     const lk = likesOf(d);
     const rc = repliesOf(d);
-    const badge = BOMBANDO_BADGES[i] || 'MERECE MAIS';
+    const badge = DESCOBERTAS_BADGES[i] || 'MERECE MAIS';
 
     const row = document.createElement('div');
-    row.className = 'bombando-row';
+    row.className = 'descobertas-row';
     row.style.animationDelay = `${i * 0.08}s`;
 
     const idx = document.createElement('div');
-    idx.className = 'bombando-idx';
+    idx.className = 'descobertas-idx';
     idx.textContent = `0${i + 1}`;
     row.appendChild(idx);
 
     const content = document.createElement('div');
-    content.className = 'bombando-content';
-    const bText = document.createElement('div');
-    bText.className = 'bombando-text';
+    content.className = 'descobertas-content';
+    const bTextWrap = document.createElement('div');
+    bTextWrap.className = 'descobertas-text-wrap';
     if (isDrawing(d)) {
       const img = document.createElement('img');
       img.src = d.message; img.alt = 'desenho';
-      img.className = 'bombando-drawing-img';
-      bText.appendChild(img);
+      img.className = 'descobertas-drawing-img';
+      bTextWrap.appendChild(img);
       if (d.caption) {
-        const cap = document.createElement('span');
-        cap.className = 'board-caption';
-        cap.textContent = d.caption;
-        bText.appendChild(cap);
+        const bText = document.createElement('div');
+        bText.className = 'descobertas-text';
+        bText.textContent = d.caption;
+        bTextWrap.appendChild(bText);
       }
     } else {
+      const bText = document.createElement('div');
+      bText.className = 'descobertas-text';
       bText.textContent = d.message || '';
+      bTextWrap.appendChild(bText);
     }
-    content.appendChild(bText);
+    content.appendChild(bTextWrap);
 
     const bAuthor = document.createElement('div');
-    bAuthor.className = 'bombando-author';
-    bAuthor.appendChild(buildAuthorChip(d.author, d.gradient, vw(26), isMod));
+    bAuthor.className = 'descobertas-author';
+    bAuthor.appendChild(buildAuthorChip(d.author, d.gradient, chipSize('reply'), isMod));
     const baName = document.createElement('span');
-    baName.className = 'bombando-author-name';
+    baName.className = 'descobertas-author-name';
     baName.textContent = '@' + (d.author || 'anônimo');
     bAuthor.appendChild(baName);
     const baTime = document.createElement('span');
-    baTime.className = 'bombando-author-time';
+    baTime.className = 'descobertas-author-time';
     baTime.textContent = '· ' + formatTime(d.createdAt);
     bAuthor.appendChild(baTime);
     content.appendChild(bAuthor);
     row.appendChild(content);
 
     const bBadge = document.createElement('div');
-    bBadge.className = 'bombando-badge';
+    bBadge.className = 'descobertas-badge';
     bBadge.textContent = badge;
     row.appendChild(bBadge);
 
     const bCounts = document.createElement('div');
-    bCounts.className = 'bombando-counts';
+    bCounts.className = 'descobertas-counts';
     bCounts.innerHTML = `
-      <span style="color:var(--pink-lt);font-size:${vw(20)}px;">♥ ${lk}</span>
-      <span style="color:var(--text-dim);font-size:${vw(16)}px;">${SVG_REPLIES} ${rc}</span>
+      <span style="color:var(--pink-lt);font-size:${countSize}px;">♥ ${lk}</span>
+      <span style="color:var(--text-dim);font-size:${countSize}px;">${SVG_REPLIES} ${rc}</span>
     `;
     row.appendChild(bCounts);
     boardScene.appendChild(row);
@@ -716,31 +723,30 @@ function renderBombando() {
 }
 
 // ════════════════════════════════════════
-// RENDER: NUDGE / PARTICIPE
+// RENDER: PARTICIPE (nudge / QR)
 // ════════════════════════════════════════
-function renderNudge() {
-  boardScene.className = 'board-scene view-nudge no-label scene-enter';
+function renderParticipe() {
+  boardScene.className = 'board-scene view-participe no-label scene-enter';
 
-  // Left: POSTE / AGORA / MESMO
   const left = document.createElement('div');
-  left.className = 'nudge-left';
+  left.className = 'participe-left';
 
   const ghostStack = document.createElement('div');
-  ghostStack.className = 'nudge-ghost-stack';
+  ghostStack.className = 'participe-ghost-stack';
   for (const word of ['POSTE','AGORA','MESMO']) {
     const el = document.createElement('span');
-    el.className = 'nudge-ghost-word';
+    el.className = 'participe-ghost-word';
     el.textContent = word;
     ghostStack.appendChild(el);
   }
   left.appendChild(ghostStack);
 
   const solidStack = document.createElement('div');
-  solidStack.className = 'nudge-solid-stack';
+  solidStack.className = 'participe-solid-stack';
   const words = [
-    { text:'POSTE', cls:'nudge-word nudge-word-white'    },
-    { text:'AGORA', cls:'nudge-word nudge-word-gradient' },
-    { text:'MESMO', cls:'nudge-word nudge-word-white'    },
+    { text:'POSTE', cls:'participe-word participe-word-white'    },
+    { text:'AGORA', cls:'participe-word participe-word-gradient' },
+    { text:'MESMO', cls:'participe-word participe-word-white'    },
   ];
   for (const { text, cls } of words) {
     const el = document.createElement('span');
@@ -751,26 +757,25 @@ function renderNudge() {
   left.appendChild(solidStack);
   boardScene.appendChild(left);
 
-  // Right: QR + URL
   const right = document.createElement('div');
-  right.className = 'nudge-right';
+  right.className = 'participe-right';
 
   const caption = document.createElement('div');
-  caption.className = 'nudge-caption';
+  caption.className = 'participe-caption';
   caption.textContent = 'escaneie · poste · apareça aqui em segundos';
   right.appendChild(caption);
 
   const qrWrap = document.createElement('div');
-  qrWrap.className = 'nudge-qr-wrap';
+  qrWrap.className = 'participe-qr-wrap';
   const qrImg = document.createElement('img');
-  qrImg.className = 'nudge-qr-img';
+  qrImg.className = 'participe-qr-img';
   qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=10&data=${encodeURIComponent('https://weverse-hangover.pages.dev')}`;
   qrImg.alt = 'QR Code — weverse-hangover.pages.dev';
   qrWrap.appendChild(qrImg);
   right.appendChild(qrWrap);
 
   const url = document.createElement('div');
-  url.className = 'nudge-url';
+  url.className = 'participe-url';
   url.textContent = 'WEVERSE-HANGOVER.PAGES.DEV';
   right.appendChild(url);
 
@@ -818,4 +823,3 @@ document.addEventListener('keydown', e => {
     if (!isPaused) scheduleNext();
   }
 });
-
