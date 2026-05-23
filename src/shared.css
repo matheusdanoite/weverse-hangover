@@ -560,3 +560,41 @@ input, textarea { font-family: var(--font-main); }
 .toast.show    { opacity: 1; transform: translateX(-50%) translateY(0); }
 .toast.success { border-color: rgba(52, 232, 158, 0.4); color: var(--green); }
 .toast.error   { border-color: rgba(255, 59, 59, 0.4); color: var(--red); }
+
+/* ════════════ COUNTDOWN OVERLAY ════════════ */
+.countdown-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  text-align: center;
+  padding: 20px;
+}
+.countdown-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--pink-neon);
+  margin-bottom: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.countdown-timer {
+  font-size: 4rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  background: linear-gradient(135deg, var(--pink-neon) 0%, var(--blue-electric) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.countdown-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-top: 20px;
+}
+

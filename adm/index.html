@@ -350,7 +350,15 @@
     </div>
     <div id="reportsList" class="post-list"></div>
 
-    <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: center;">
+    <div id="countdownSettingsPanel" style="margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border-subtle); display: flex; flex-direction: column; align-items: center; gap: 12px;">
+      <h3 style="font-size: 1rem; color: var(--pink-neon);">Contagem Regressiva</h3>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <input type="datetime-local" id="countdownTimeInput" class="search-input" style="min-width: 200px;">
+        <button id="toggleCountdownBtn" class="btn-report-maintain" style="padding: 9px 20px;">Iniciar</button>
+      </div>
+    </div>
+
+    <footer style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: center;">
       <button id="toggleOfflineBtn" class="btn-report-del" style="max-width: 200px;">Retirar do ar</button>
     </footer>
 

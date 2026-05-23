@@ -2426,3 +2426,65 @@ onSnapshot(doc(db, 'hangul_bans', 'SYSTEM_OFFLINE'), (snap) => {
     location.reload();
   }
 });
+
+// ── COUNTDOWN LOGIC ──
+const countdownScreen = document.getElementById('countdownScreen');
+const countdownTimerText = document.getElementById('countdownTimerText');
+let countdownInterval = null;
+let countdownActive = false;
+let countdownTarget = null;
+let wasCountdownActive = false;
+
+function updateCountdownDisplay() {
+  if (!countdownActive || !countdownTarget) return;
+  const now = new Date().getTime();
+  const target = countdownTarget.getTime();
+  const diff = target - now;
+  
+  if (diff <= 0) {
+    // Countdown finished
+    countdownTimerText.textContent = "00:00:00";
+    if (countdownInterval) clearInterval(countdownInterval);
+    // Refresh to clear the block
+    location.reload();
+    return;
+  }
+  
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const secs = Math.floor((diff % (1000 * 60)) / 1000);
+  
+  const pad = n => String(n).padStart(2, '0');
+  countdownTimerText.textContent = `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
+}
+
+onSnapshot(doc(db, 'hangul_bans', 'SYSTEM_COUNTDOWN'), (snap) => {
+  if (snap.exists()) {
+    const data = snap.data();
+    countdownActive = data.active === true;
+    countdownTarget = data.targetTime ? new Date(data.targetTime) : null;
+    
+    if (countdownActive && countdownTarget) {
+      const now = new Date().getTime();
+      if (countdownTarget.getTime() > now) {
+        wasCountdownActive = true;
+        countdownScreen?.classList.remove('hidden');
+        if (countdownInterval) clearInterval(countdownInterval);
+        updateCountdownDisplay();
+        countdownInterval = setInterval(updateCountdownDisplay, 1000);
+      } else {
+        // Already expired. Just hide the overlay, no reload needed.
+        countdownScreen?.classList.add('hidden');
+        if (countdownInterval) clearInterval(countdownInterval);
+      }
+    } else {
+      if (wasCountdownActive) {
+        // If it was active and now is stopped by admin, refresh
+        location.reload();
+      } else {
+        countdownScreen?.classList.add('hidden');
+        if (countdownInterval) clearInterval(countdownInterval);
+      }
+    }
+  }
+});

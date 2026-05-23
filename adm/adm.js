@@ -687,3 +687,53 @@ if (toggleOfflineBtn) {
     }
   });
 }
+
+// ── Countdown Control ──
+const countdownTimeInput = document.getElementById('countdownTimeInput');
+const toggleCountdownBtn = document.getElementById('toggleCountdownBtn');
+let isCountdownActive = false;
+
+if (toggleCountdownBtn && countdownTimeInput) {
+  // Default to 2026-05-23T22:00
+  countdownTimeInput.value = "2026-05-23T22:00";
+
+  onSnapshot(doc(db, 'hangul_bans', 'SYSTEM_COUNTDOWN'), (snap) => {
+    if (snap.exists()) {
+      const data = snap.data();
+      isCountdownActive = data.active || false;
+      if (data.targetTime) {
+        // Format targetTime for datetime-local (YYYY-MM-DDThh:mm)
+        const d = new Date(data.targetTime);
+        if (!isNaN(d)) {
+          const pad = n => String(n).padStart(2, '0');
+          countdownTimeInput.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+      }
+      toggleCountdownBtn.textContent = isCountdownActive ? 'Encerrar Contagem' : 'Iniciar Contagem';
+      toggleCountdownBtn.className = isCountdownActive ? 'btn-report-del' : 'btn-report-maintain';
+    }
+  });
+
+  toggleCountdownBtn.addEventListener('click', async () => {
+    try {
+      const newStatus = !isCountdownActive;
+      const targetTimeVal = countdownTimeInput.value;
+      if (!targetTimeVal && newStatus) {
+        showToast('Defina o horário alvo', 'error');
+        return;
+      }
+      let targetTimeIso = null;
+      if (targetTimeVal) {
+        const d = new Date(targetTimeVal);
+        targetTimeIso = d.toISOString();
+      }
+      await setDoc(doc(db, 'hangul_bans', 'SYSTEM_COUNTDOWN'), {
+        active: newStatus,
+        targetTime: targetTimeIso
+      }, { merge: true });
+      showToast(newStatus ? 'Contagem iniciada' : 'Contagem encerrada', 'success');
+    } catch (err) {
+      showToast('Erro ao atualizar contagem: ' + err.message, 'error');
+    }
+  });
+}
