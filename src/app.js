@@ -844,6 +844,9 @@ const emptyFeed = document.getElementById('emptyFeed');
 const feedLoading = document.getElementById('feedLoading');
 
 let activeTab = 'all';
+let searchQuery = '';
+let searchResultsMap = new Map();
+let _searchLoading = false;
 
 function getPostsForTab(tab) {
   const all = [];
@@ -1069,6 +1072,7 @@ async function _doLike(id, data, liked) {
       updates.lastLikerName = me.name;
       updates.lastLikerGradient = me.gradient;
       updates.lastLikerId = me.id;
+      updates.lastLikedAt = serverTimestamp();
     }
     await updateDoc(ref, updates);
   } catch (err) {
@@ -1130,6 +1134,7 @@ function initReplySection(id, postEl) {
         lastReplyAuthor: me.name,
         lastReplyText: txt.slice(0, 100),
         lastReplyGradient: me.gradient,
+        lastRepliedAt: serverTimestamp(),
         replyUniqueAuthors: arrayUnion(me.id),
       });
       writeMentions(txt, id, 'reply');
@@ -1538,8 +1543,137 @@ function renderTrending() {
   }
 }
 
+// ═══════════════════════════════════════════
+// SEARCH
+// ═══════════════════════════════════════════
+const searchBtn       = document.getElementById('searchBtn');
+const feedSearchBar   = document.getElementById('feedSearchBar');
+const feedSearchInput = document.getElementById('feedSearchInput');
+const feedSearchClose = document.getElementById('feedSearchClose');
+
+function openSearch() {
+  feedSearchBar.classList.remove('hidden');
+  feedSearchInput.focus();
+  feedTabs.classList.add('hidden');
+  loadSentinel.remove();
+}
+
+function closeSearch() {
+  feedSearchBar.classList.add('hidden');
+  feedSearchInput.value = '';
+  feedTabs.classList.remove('hidden');
+  document.querySelector('.search-results-info')?.remove();
+  searchQuery = '';
+  searchResultsMap.clear();
+  cardElements.clear();
+  feed.innerHTML = '';
+  renderFeed();
+}
+
+searchBtn.addEventListener('click', openSearch);
+feedSearchClose.addEventListener('click', closeSearch);
+
+let _searchTimer;
+feedSearchInput.addEventListener('input', () => {
+  clearTimeout(_searchTimer);
+  const q = feedSearchInput.value.trim();
+  if (!q) {
+    searchQuery = '';
+    searchResultsMap.clear();
+    renderFeed();
+    return;
+  }
+  _searchTimer = setTimeout(() => performSearch(q), 350);
+});
+
+async function performSearch(q) {
+  if (_searchLoading) return;
+  const term = q.toLowerCase();
+  _searchLoading = true;
+  searchQuery = term;
+
+  cleanupTrendingSections();
+  feed.classList.remove('feed-gallery');
+  feed.classList.add('feed-list');
+  feed.innerHTML = `<div class="search-loading"><svg class="spinner" width="28" height="28" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="rgba(255,45,120,0.25)" stroke-width="2.5" fill="none"/><path d="M12 2a10 10 0 0 1 10 10" stroke="#ff2d78" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg></div>`;
+
+  try {
+    const matchingIds = new Set();
+    const tempMap = new Map();
+
+    const postsSnap = await getDocs(query(collection(db, POSTS), orderBy('createdAt', 'desc')));
+    postsSnap.forEach(d => {
+      const data = d.data();
+      tempMap.set(d.id, data);
+      if (
+        (data.author || '').toLowerCase().includes(term) ||
+        (data.message || '').toLowerCase().includes(term) ||
+        (data.caption || '').toLowerCase().includes(term)
+      ) matchingIds.add(d.id);
+    });
+
+    const repliesSnap = await getDocs(query(collectionGroup(db, 'replies'), limit(1000)));
+    repliesSnap.forEach(d => {
+      const data = d.data();
+      if (
+        (data.author || '').toLowerCase().includes(term) ||
+        (data.message || '').toLowerCase().includes(term)
+      ) {
+        const postId = d.ref.parent.parent.id;
+        matchingIds.add(postId);
+      }
+    });
+
+    searchResultsMap.clear();
+    for (const id of matchingIds) {
+      const data = tempMap.get(id);
+      if (data) searchResultsMap.set(id, data);
+    }
+  } catch (err) {
+    console.error('search error', err);
+  } finally {
+    _searchLoading = false;
+  }
+
+  if (searchQuery === term) renderFeed();
+}
+
+function renderSearchResults() {
+  cleanupTrendingSections();
+  feed.classList.remove('feed-gallery');
+  feed.classList.add('feed-list');
+
+  const cmp = (a, b) => (b[1].createdAt?.seconds || 0) - (a[1].createdAt?.seconds || 0);
+  const results = [...searchResultsMap.entries()].sort(cmp);
+
+  let infoEl = feed.previousElementSibling;
+  if (!infoEl?.classList.contains('search-results-info')) {
+    infoEl = document.createElement('div');
+    infoEl.className = 'search-results-info';
+    feed.parentNode.insertBefore(infoEl, feed);
+  }
+  infoEl.textContent = results.length === 0
+    ? 'nenhum resultado encontrado.'
+    : `${results.length} resultado${results.length !== 1 ? 's' : ''} para "${feedSearchInput.value.trim()}"`;
+
+  if (results.length === 0) {
+    feed.querySelectorAll('[data-id]').forEach(el => el.remove());
+    return;
+  }
+
+  renderInto(feed, results);
+  loadSentinel.remove();
+}
+
 function renderFeed() {
   updateTabCounts();
+
+  if (searchQuery) {
+    renderSearchResults();
+    return;
+  }
+
+  document.querySelector('.search-results-info')?.remove();
 
   // Trending tab has its own render path with two sections
   if (activeTab === 'top') {
@@ -1833,7 +1967,8 @@ function renderNotifList() {
       const otherLikerIds = (data.likedBy || [])
         .filter(uid => uid !== me?.id && uid !== data.lastLikerId)
         .slice(-3);
-      items.push({ id, postDate, hasNew, icon: heartSVG, type: 'like', avatarName: liker, extra, textHTML, isDrawing, drawingSrc, preview: postPreviewText, likerGradient, otherLikerIds });
+      const actionDate = data.lastLikedAt?.seconds || postDate;
+      items.push({ id, postDate: actionDate, hasNew, icon: heartSVG, type: 'like', avatarName: liker, extra, textHTML, isDrawing, drawingSrc, preview: postPreviewText, likerGradient, otherLikerIds });
     }
 
     if (replies > 0) {
@@ -1848,7 +1983,8 @@ function renderNotifList() {
         ? data.lastReplyText.slice(0, 100)
         : postPreviewText;
       const replyGradient = data.lastReplyGradient || null;
-      items.push({ id, postDate, hasNew, icon: chatSVG, type: 'comment', avatarName: author, extra, textHTML, isDrawing, drawingSrc, preview, likerGradient: replyGradient });
+      const actionDate = data.lastRepliedAt?.seconds || postDate;
+      items.push({ id, postDate: actionDate, hasNew, icon: chatSVG, type: 'comment', avatarName: author, extra, textHTML, isDrawing, drawingSrc, preview, likerGradient: replyGradient });
     }
 
     const isRemoved = reportCount >= 7 && reportCount > maintainCount;
@@ -2118,6 +2254,7 @@ function wireLightboxComposer(composerEl, postId) {
         lastReplyAuthor: me.name,
         lastReplyText: txt.slice(0, 100),
         lastReplyGradient: me.gradient,
+        lastRepliedAt: serverTimestamp(),
         replyUniqueAuthors: arrayUnion(me.id),
       });
       writeMentions(txt, postId, 'reply');

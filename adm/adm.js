@@ -371,13 +371,27 @@ function loadPosts() {
 function renderReports() {
   const search = searchInput.value.toLowerCase().trim();
 
+  if (search) {
+    reportsSectionLabel.style.display = 'none';
+    const results = allPosts
+      .filter(p =>
+        (p.author || '').toLowerCase().includes(search) ||
+        (p.message || '').toLowerCase().includes(search) ||
+        (p.caption || '').toLowerCase().includes(search)
+      )
+      .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+
+    reportsList.innerHTML = '';
+    if (results.length === 0) {
+      reportsList.innerHTML = `<div class="state-empty"><p>nenhum resultado para "${escapeHTML(search)}"</p></div>`;
+      return;
+    }
+    results.forEach(post => reportsList.appendChild(buildReportItem(post)));
+    return;
+  }
+
   const pending = allPosts
     .filter(p => (p.reportedBy?.length || 0) > (p.maintainedCount || 0))
-    .filter(p => {
-      if (!search) return true;
-      return (p.author || '').toLowerCase().includes(search)
-          || (p.message || '').toLowerCase().includes(search);
-    })
     .sort((a, b) => {
       const da = (a.reportedBy?.length || 0) - (a.maintainedCount || 0);
       const db2 = (b.reportedBy?.length || 0) - (b.maintainedCount || 0);

@@ -154,6 +154,13 @@
         <span class="brand-hangover">HANGOVER</span>
       </div>
       <div class="topbar-actions">
+        <button class="icon-btn" id="searchBtn" title="Buscar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        </button>
         <button class="icon-btn" id="notifBtn" title="Notificações">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">
@@ -168,6 +175,22 @@
       </div>
     </div>
   </header>
+
+  <div id="feedSearchBar" class="feed-search-bar hidden">
+    <div class="feed-search-inner">
+      <svg class="feed-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input type="search" id="feedSearchInput" class="feed-search-input"
+        placeholder="buscar posts, usuários ou respostas…"
+        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+      <button id="feedSearchClose" type="button" class="feed-search-close" aria-label="Fechar busca">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </div>
 
   <main class="app-shell">
 
