@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js';
 import {
-  getFirestore, collection, onSnapshot, query, orderBy, limit
+  getFirestore, collection, onSnapshot, query, orderBy, limit, doc
 } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js';
 import {
   gradientCSS, escapeHTML, highlightMentions, formatTime
@@ -531,8 +531,6 @@ function updateCountdownDisplay() {
   const pad = n => String(n).padStart(2, '0');
   countdownTimerText.textContent = `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
 }
-
-import { doc } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js';
 
 onSnapshot(doc(db, 'hangul_bans', 'SYSTEM_COUNTDOWN'), (snap) => {
   if (snap.exists()) {
