@@ -449,17 +449,17 @@ async function downloadMyPostsAsPDF() {
     #pdf-export-container *,#pdf-export-container *::before,#pdf-export-container *::after{box-sizing:border-box;margin:0;padding:0}
     #pdf-export-container .xpage{padding:36px 24px 60px}
     #pdf-export-container .xbrand{display:flex;align-items:center;gap:14px;margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid rgba(255,255,255,.1)}
-    #pdf-export-container .xbrand-logo{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#ff2d78 0%,#9b59ff 100%);flex-shrink:0}
+    #pdf-export-container .xbrand-logo{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#ff2d78 0%,#9b59ff 100%);flex-shrink:0;overflow:hidden}
     #pdf-export-container .xbrand-w1{font-size:1.25rem;font-weight:800;letter-spacing:.1em;color:#ff2d78}
     #pdf-export-container .xbrand-w2{font-size:1.25rem;font-weight:300;letter-spacing:.18em;color:#9b59ff}
     #pdf-export-container .xbrand-sub{font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;color:rgba(240,230,255,.4);margin-top:3px}
     #pdf-export-container .xprofile-block{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:16px;margin-bottom:10px}
-    #pdf-export-container .xprofile-avatar{width:48px;height:48px;border-radius:50%;flex-shrink:0;border:2px solid rgba(255,255,255,.18)}
+    #pdf-export-container .xprofile-avatar{width:48px;height:48px;border-radius:50%;flex-shrink:0;overflow:hidden}
     #pdf-export-container .xprofile-name{font-size:1rem;font-weight:700}
     #pdf-export-container .xprofile-meta{font-size:.68rem;color:rgba(240,230,255,.45);margin-top:2px}
     #pdf-export-container .xpost-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:14px;margin-bottom:12px}
     #pdf-export-container .xpost-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-    #pdf-export-container .xpost-avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;border:1px solid rgba(255,255,255,.15)}
+    #pdf-export-container .xpost-avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;overflow:hidden}
     #pdf-export-container .xpost-author{font-size:.86rem;font-weight:700}
     #pdf-export-container .xpost-time{font-size:.64rem;color:rgba(240,230,255,.4);margin-top:1px}
     #pdf-export-container .xpost-content{font-size:.92rem;line-height:1.5;white-space:pre-wrap;word-break:break-word;color:#e8deff}
@@ -509,11 +509,13 @@ async function downloadMyPostsAsPDF() {
   document.body.appendChild(container);
 
   try {
-    const canvas = await html2canvas(container.querySelector('.xpage'), {
+    const targetEl = container.querySelector('.xpage');
+    const canvas = await html2canvas(targetEl, {
       scale: 2, useCORS: true, backgroundColor: '#1a0a2e', logging: false,
+      windowWidth: 580, windowHeight: targetEl.scrollHeight
     });
     const W = canvas.width / 2, H = canvas.height / 2;
-    const pdf = new window.jspdf.jsPDF({ orientation: 'p', unit: 'px', format: [W, H] });
+    const pdf = new window.jspdf.jsPDF({ orientation: W > H ? 'l' : 'p', unit: 'px', format: [W, H] });
     pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, W, H);
     const blob = pdf.output('blob');
     const url = URL.createObjectURL(blob);
