@@ -20,10 +20,7 @@ const boardScene     = document.getElementById('boardGrid');
 const emptyState     = document.getElementById('emptyState');
 const viewLabelWrap  = document.getElementById('viewLabelWrap');
 const viewLabelText  = document.getElementById('viewLabelText');
-const viewLabelSub   = document.getElementById('viewLabelSub');
-const postCountVal   = document.getElementById('postCountVal');
 const tickerTrack    = document.getElementById('tickerTrack');
-const liveClock      = document.getElementById('liveClock');
 
 // ── Data store ──
 const allPosts    = new Map();
@@ -34,12 +31,12 @@ const VIEWS     = ['curtidos', 'recentes', 'comentados', 'bombando', 'nudge'];
 const DURATIONS = { curtidos: 14000, recentes: 14000, comentados: 18000, bombando: 16000, nudge: 15000 };
 
 const VIEW_CFG = {
-  curtidos:  { label: 'MAIS CURTIDOS',    sub: 'TOP DA NOITE',              tint: 'default' },
-  recentes:  { label: 'AGORA',            sub: 'ACABOU DE CHEGAR',          tint: 'hot'     },
-  comentados:{ label: 'DISCUTINDO AGORA', sub: 'MAIS RESPOSTAS DA NOITE',   tint: 'cool'    },
-  bombando:  { label: 'E TEM MAIS…',      sub: 'POSTS QUE MERECEM ATENÇÃO', tint: 'default' },
-  nudge:     { label: '',                 sub: '',                           tint: 'hot'     },
-  breaking:  { label: '',                 sub: '',                           tint: 'hot'     },
+  curtidos:  { label: 'MAIS CURTIDOS', tint: 'default' },
+  recentes:  { label: 'AGORA',         tint: 'hot'     },
+  comentados:{ label: 'COMENTE',       tint: 'cool'    },
+  bombando:  { label: 'E TEM MAIS…',   tint: 'default' },
+  nudge:     { label: '',              tint: 'hot'     },
+  breaking:  { label: '',              tint: 'hot'     },
 };
 
 let viewIndex         = 0;
@@ -58,6 +55,10 @@ const BOMBANDO_BADGES = ['AINDA SEM SER VISTO', 'SÓ UM CURTIDO', 'MERECE MAIS',
 
 const DRAWING_RE = /^data:image\/(png|jpeg|gif|webp);base64,/;
 function isDrawing(d) { return d.type === 'drawing' && typeof d.message === 'string' && DRAWING_RE.test(d.message); }
+
+// ── Viewport scale helpers (referência 1024×768) ──
+const vw = px => Math.round(window.innerWidth  * px / 1024);
+const vh = px => Math.round(window.innerHeight * px / 768);
 
 // ── Helpers ──
 function gradientCSS(g) {
@@ -84,15 +85,6 @@ function formatTime(ts) {
 
 function likesOf(data)   { return (data.likedBy || []).length; }
 function repliesOf(data) { return data.replyCount || 0; }
-
-// ── Live clock ──
-function updateClock() {
-  const n = new Date();
-  liveClock.textContent =
-    String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
-}
-setInterval(updateClock, 1000);
-updateClock();
 
 // ── Stats & ticker ──
 function computeStats() {
@@ -131,10 +123,6 @@ function updateTicker() {
   }
 }
 
-function updatePostCount() {
-  postCountVal.textContent = allPosts.size;
-}
-
 // ── Author chip builder ──
 function buildAuthorChip(author, gradient, size, isMod) {
   const initial = (author || '?').charAt(0).toUpperCase();
@@ -166,11 +154,12 @@ function buildAuthorChip(author, gradient, size, isMod) {
 // ── Corner ticks ──
 function addCornerTicks(el, color = '#ff2d78', sz = 20) {
   const T = `2px solid ${color}`;
+  const pos = vw(10) + 'px';
   const corners = [
-    { top:'10px', left:'10px',   borderTop:T, borderLeft:T   },
-    { top:'10px', right:'10px',  borderTop:T, borderRight:T  },
-    { bottom:'10px', left:'10px',  borderBottom:T, borderLeft:T  },
-    { bottom:'10px', right:'10px', borderBottom:T, borderRight:T },
+    { top:pos, left:pos,   borderTop:T, borderLeft:T   },
+    { top:pos, right:pos,  borderTop:T, borderRight:T  },
+    { bottom:pos, left:pos,  borderBottom:T, borderLeft:T  },
+    { bottom:pos, right:pos, borderBottom:T, borderRight:T },
   ];
   for (const styles of corners) {
     const tick = document.createElement('div');
@@ -204,7 +193,6 @@ function applyView(view) {
 
   if (!hideLabel) {
     viewLabelText.textContent = cfg.label;
-    viewLabelSub.textContent  = cfg.sub ? `// ${cfg.sub}` : '';
   }
 }
 
@@ -268,7 +256,6 @@ onSnapshot(postsQ, snap => {
   topCommented.forEach(p => ensureReplies(p.id));
   pruneReplies(keepIds);
 
-  updatePostCount();
   updateTicker();
 
   if (!isReady) {
@@ -382,7 +369,7 @@ function renderCurtidos() {
   const heroCard = document.createElement('article');
   heroCard.className = 'hero-card';
   heroCard.dataset.postId = hero.id;
-  addCornerTicks(heroCard, '#ff2d78', 20);
+  addCornerTicks(heroCard, '#ff2d78', vw(20));
 
   const heroRankEl = document.createElement('div');
   heroRankEl.className = 'hero-rank';
@@ -402,7 +389,7 @@ function renderCurtidos() {
   if (isDrawing(heroData)) {
     const img = document.createElement('img');
     img.src = heroData.message; img.alt = 'desenho';
-    img.style.cssText = 'max-width:100%;max-height:200px;object-fit:contain;border-radius:8px;background:#fff;';
+    img.style.cssText = `max-width:100%;max-height:${vh(200)}px;object-fit:contain;border-radius:8px;background:#fff;`;
     textEl.appendChild(img);
     if (heroData.caption) {
       const cap = document.createElement('div');
@@ -417,7 +404,7 @@ function renderCurtidos() {
 
   const footer = document.createElement('div');
   footer.className = 'hero-footer';
-  footer.appendChild(buildAuthorChip(heroData.author, heroData.gradient, 72, heroMod));
+  footer.appendChild(buildAuthorChip(heroData.author, heroData.gradient, vw(72), heroMod));
   const authorInfo = document.createElement('div');
   authorInfo.className = 'hero-author-info';
   authorInfo.innerHTML = `
@@ -449,7 +436,7 @@ function renderCurtidos() {
     card.className = 'side-card';
     card.dataset.postId = p.id;
     card.style.animationDelay = `${i * 0.12}s`;
-    addCornerTicks(card, 'rgba(255,255,255,0.3)', 16);
+    addCornerTicks(card, 'rgba(255,255,255,0.3)', vw(16));
 
     const rank = document.createElement('div');
     rank.className = 'side-rank';
@@ -466,7 +453,7 @@ function renderCurtidos() {
     if (isDrawing(pd)) {
       const img = document.createElement('img');
       img.src = pd.message; img.alt = 'desenho';
-      img.style.cssText = 'max-width:100%;max-height:90px;object-fit:contain;border-radius:4px;background:#fff;';
+      img.style.cssText = `max-width:100%;max-height:${vh(90)}px;object-fit:contain;border-radius:4px;background:#fff;`;
       sideText.appendChild(img);
       if (pd.caption) {
         const cap = document.createElement('div');
@@ -481,7 +468,7 @@ function renderCurtidos() {
 
     const sideFooter = document.createElement('div');
     sideFooter.className = 'side-footer';
-    sideFooter.appendChild(buildAuthorChip(pd.author, pd.gradient, 44, pMod));
+    sideFooter.appendChild(buildAuthorChip(pd.author, pd.gradient, vw(44), pMod));
     const sName = document.createElement('div');
     sName.className = 'side-author-name';
     sName.textContent = '@' + (pd.author || 'anônimo');
@@ -534,11 +521,11 @@ function renderBreakingCard(post, timeStr) {
 
   const card = document.createElement('div');
   card.className = 'breaking-card';
-  addCornerTicks(card, '#ff2d78', 28);
+  addCornerTicks(card, '#ff2d78', vw(28));
 
   const hdr = document.createElement('div');
   hdr.className = 'breaking-card-header';
-  hdr.appendChild(buildAuthorChip(d.author, d.gradient, 84, isMod));
+  hdr.appendChild(buildAuthorChip(d.author, d.gradient, vw(84), isMod));
   const aInfo = document.createElement('div');
   aInfo.innerHTML = `
     <div class="breaking-author-name">@${escapeHTML(d.author || 'anônimo')}</div>
@@ -593,7 +580,7 @@ function renderComentados() {
   // ── Left: original post ──
   const postCard = document.createElement('article');
   postCard.className = 'comentados-post';
-  addCornerTicks(postCard, '#00d4ff', 16);
+  addCornerTicks(postCard, '#00d4ff', vw(16));
 
   const topRow = document.createElement('div');
   topRow.innerHTML = `
@@ -607,7 +594,7 @@ function renderComentados() {
   if (isDrawing(d)) {
     const img = document.createElement('img');
     img.src = d.message; img.alt = 'desenho';
-    img.style.cssText = 'max-width:100%;max-height:180px;object-fit:contain;border-radius:8px;background:#fff;';
+    img.style.cssText = `max-width:100%;max-height:${vh(180)}px;object-fit:contain;border-radius:8px;background:#fff;`;
     textEl.appendChild(img);
     if (d.caption) {
       const cap = document.createElement('div');
@@ -622,7 +609,7 @@ function renderComentados() {
 
   const postFooter = document.createElement('div');
   postFooter.className = 'comentados-post-footer';
-  postFooter.appendChild(buildAuthorChip(d.author, d.gradient, 64, isMod));
+  postFooter.appendChild(buildAuthorChip(d.author, d.gradient, vw(64), isMod));
   const pName = document.createElement('div');
   pName.className = 'comentados-post-author';
   pName.textContent = '@' + (d.author || 'anônimo');
@@ -630,8 +617,8 @@ function renderComentados() {
   const pCounts = document.createElement('div');
   pCounts.className = 'comentados-post-counts';
   pCounts.innerHTML = `
-    <span style="color:var(--pink-lt);font-size:28px;font-family:var(--font-mono);font-weight:800;">♥${lk}</span>
-    <span style="color:var(--cyan);font-size:28px;font-family:var(--font-mono);font-weight:800;">💬${rc}</span>
+    <span style="color:var(--pink-lt);font-size:${vw(28)}px;font-family:var(--font-mono);font-weight:800;">♥${lk}</span>
+    <span style="color:var(--cyan);font-size:${vw(28)}px;font-family:var(--font-mono);font-weight:800;">💬${rc}</span>
   `;
   postFooter.appendChild(pCounts);
   postCard.appendChild(postFooter);
@@ -649,7 +636,7 @@ function renderComentados() {
   const replies = post.replies || [];
   if (!replies.length) {
     const empty = document.createElement('div');
-    empty.style.cssText = 'color:var(--text-muted);font-size:14px;letter-spacing:2px;padding:20px 0;font-family:var(--font-mono);';
+    empty.style.cssText = `color:var(--text-muted);font-size:${vw(14)}px;letter-spacing:2px;padding:${vh(20)}px 0;font-family:var(--font-mono);`;
     empty.textContent = 'carregando respostas…';
     repliesCol.appendChild(empty);
   } else {
@@ -660,7 +647,7 @@ function renderComentados() {
 
       const bHdr = document.createElement('div');
       bHdr.className = 'reply-bubble-header';
-      bHdr.appendChild(buildAuthorChip(r.author, r.gradient, 28, MOD_NAMES.has(r.author)));
+      bHdr.appendChild(buildAuthorChip(r.author, r.gradient, vw(28), MOD_NAMES.has(r.author)));
       const bMeta = document.createElement('span');
       bMeta.className = 'reply-bubble-author';
       bMeta.textContent = '@' + (r.author || 'anônimo');
@@ -674,7 +661,7 @@ function renderComentados() {
       if (isDrawing(r)) {
         const img = document.createElement('img');
         img.src = r.message; img.alt = 'desenho';
-        img.style.cssText = 'max-height:44px;object-fit:contain;border-radius:4px;background:#fff;';
+        img.style.cssText = `max-height:${vh(44)}px;object-fit:contain;border-radius:4px;background:#fff;`;
         bubble.appendChild(img);
       } else {
         const bText = document.createElement('div');
@@ -771,7 +758,7 @@ function renderBombando() {
 
     const bAuthor = document.createElement('div');
     bAuthor.className = 'bombando-author';
-    bAuthor.appendChild(buildAuthorChip(d.author, d.gradient, 26, isMod));
+    bAuthor.appendChild(buildAuthorChip(d.author, d.gradient, vw(26), isMod));
     const baName = document.createElement('span');
     baName.className = 'bombando-author-name';
     baName.textContent = '@' + (d.author || 'anônimo');
@@ -791,8 +778,8 @@ function renderBombando() {
     const bCounts = document.createElement('div');
     bCounts.className = 'bombando-counts';
     bCounts.innerHTML = `
-      <span style="color:var(--pink-lt);font-size:20px;">♥ ${lk}</span>
-      <span style="color:var(--text-dim);font-size:16px;">💬 ${rc}</span>
+      <span style="color:var(--pink-lt);font-size:${vw(20)}px;">♥ ${lk}</span>
+      <span style="color:var(--text-dim);font-size:${vw(16)}px;">💬 ${rc}</span>
     `;
     row.appendChild(bCounts);
     boardScene.appendChild(row);
