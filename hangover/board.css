@@ -584,3 +584,25 @@ html,body {
 .empty-state .empty-sub { font-size:0.95rem;color:var(--text-muted);letter-spacing:2px; }
 
 ::selection { background:rgba(255,45,120,0.35);color:white; }
+
+/* ════════════ PAUSE INDICATOR ════════════ */
+.pause-indicator {
+  position:fixed;
+  bottom:calc(var(--ftr-h) + 18px);
+  right:24px;
+  z-index:200;
+  font-family:var(--font-mono);
+  font-size:13px;
+  font-weight:700;
+  letter-spacing:3px;
+  color:var(--gold);
+  text-shadow:0 0 12px rgba(255,215,0,0.6);
+  background:rgba(0,0,0,0.72);
+  border:1px solid rgba(255,215,0,0.45);
+  padding:7px 16px;
+  border-radius:4px;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity 0.2s ease;
+}
+.pause-indicator.visible { opacity:1; }

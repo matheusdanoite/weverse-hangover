@@ -52,6 +52,7 @@ const olhoShown       = new Set();
 let isBreaking        = false;
 let breakingTimer     = null;
 let isReady           = false;
+let isPaused          = false;
 
 // ── Gradient constants for reply bubbles ──
 const REPLY_GRADS = [
@@ -279,7 +280,7 @@ onSnapshot(postsQ, snap => {
   if (!isReady) {
     isReady = true;
     startViews();
-  } else if (newlyAdded.length) {
+  } else if (newlyAdded.length && !isPaused) {
     const newest = newlyAdded.sort(
       (a, b) => (b.data().createdAt?.seconds || 0) - (a.data().createdAt?.seconds || 0)
     )[0];
@@ -295,6 +296,7 @@ function startViews() {
 
 function scheduleNext() {
   clearTimeout(viewTimer);
+  if (isPaused) return;
   viewTimer = setTimeout(() => {
     viewIndex = (viewIndex + 1) % VIEWS.length;
     renderCurrentView();
@@ -833,6 +835,48 @@ function renderNudge() {
 
   boardScene.appendChild(right);
 }
+
+// ── Pause / resume ──
+const pauseIndicator = document.getElementById('pauseIndicator');
+
+function togglePause() {
+  isPaused = !isPaused;
+  pauseIndicator.classList.toggle('visible', isPaused);
+
+  if (isPaused) {
+    clearTimeout(viewTimer);
+    clearTimeout(breakingTimer);
+  } else {
+    isBreaking = false;
+    applyView(VIEWS[viewIndex]);
+    renderCurrentView();
+    scheduleNext();
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input,textarea')) return;
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (isReady) togglePause();
+  } else if (e.code === 'ArrowRight' && isReady) {
+    e.preventDefault();
+    isBreaking = false;
+    clearTimeout(viewTimer);
+    clearTimeout(breakingTimer);
+    viewIndex = (viewIndex + 1) % VIEWS.length;
+    renderCurrentView();
+    if (!isPaused) scheduleNext();
+  } else if (e.code === 'ArrowLeft' && isReady) {
+    e.preventDefault();
+    isBreaking = false;
+    clearTimeout(viewTimer);
+    clearTimeout(breakingTimer);
+    viewIndex = (viewIndex - 1 + VIEWS.length) % VIEWS.length;
+    renderCurrentView();
+    if (!isPaused) scheduleNext();
+  }
+});
 
 // ── Refresh timestamps every 30s ──
 setInterval(() => {
