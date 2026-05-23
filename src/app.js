@@ -1565,6 +1565,15 @@ function closeSearch() {
   document.querySelector('.search-results-info')?.remove();
   searchQuery = '';
   searchResultsMap.clear();
+  // Tear down observers and subscriptions for search-result cards before clearing DOM
+  feed.querySelectorAll('[data-id]').forEach(el => {
+    const id = el.dataset.id;
+    seenObserver.unobserve(el);
+    replySubObserver.unobserve(el);
+    visibilityObserver.unobserve(el);
+    visibleCards.delete(id);
+    if (replySubs.has(id)) { replySubs.get(id)(); replySubs.delete(id); }
+  });
   cardElements.clear();
   feed.innerHTML = '';
   renderFeed();
@@ -1592,6 +1601,17 @@ async function performSearch(q) {
   _searchLoading = true;
   searchQuery = term;
 
+  // Tear down any cards rendered by a previous search before replacing the DOM
+  feed.querySelectorAll('[data-id]').forEach(el => {
+    const id = el.dataset.id;
+    seenObserver.unobserve(el);
+    replySubObserver.unobserve(el);
+    visibilityObserver.unobserve(el);
+    visibleCards.delete(id);
+    if (replySubs.has(id)) { replySubs.get(id)(); replySubs.delete(id); }
+    cardElements.delete(id);
+  });
+
   cleanupTrendingSections();
   feed.classList.remove('feed-gallery');
   feed.classList.add('feed-list');
@@ -1601,7 +1621,7 @@ async function performSearch(q) {
     const matchingIds = new Set();
     const tempMap = new Map();
 
-    const postsSnap = await getDocs(query(collection(db, POSTS), orderBy('createdAt', 'desc')));
+    const postsSnap = await getDocs(query(collection(db, POSTS), orderBy('createdAt', 'desc'), limit(500)));
     postsSnap.forEach(d => {
       const data = d.data();
       tempMap.set(d.id, data);
@@ -1639,6 +1659,7 @@ async function performSearch(q) {
 }
 
 function renderSearchResults() {
+  feed.querySelector('.search-loading')?.remove();
   cleanupTrendingSections();
   feed.classList.remove('feed-gallery');
   feed.classList.add('feed-list');
