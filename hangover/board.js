@@ -54,16 +54,10 @@ let breakingTimer     = null;
 let isReady           = false;
 let isPaused          = false;
 
-// ── Gradient constants for reply bubbles ──
-const REPLY_GRADS = [
-  ['#00d4ff','#9b59ff'],
-  ['#ff2d78','#ffd700'],
-  ['#9b59ff','#ff6ba6'],
-  ['#ff6ba6','#00d4ff'],
-  ['#ffd700','#ff2d78'],
-];
-
 const BOMBANDO_BADGES = ['AINDA SEM SER VISTO', 'SÓ UM CURTIDO', 'MERECE MAIS', 'PASSOU BATIDO'];
+
+const DRAWING_RE = /^data:image\/(png|jpeg|gif|webp);base64,/;
+function isDrawing(d) { return d.type === 'drawing' && typeof d.message === 'string' && DRAWING_RE.test(d.message); }
 
 // ── Helpers ──
 function gradientCSS(g) {
@@ -387,6 +381,7 @@ function renderCurtidos() {
 
   const heroCard = document.createElement('article');
   heroCard.className = 'hero-card';
+  heroCard.dataset.postId = hero.id;
   addCornerTicks(heroCard, '#ff2d78', 20);
 
   const heroRankEl = document.createElement('div');
@@ -403,14 +398,19 @@ function renderCurtidos() {
   heroCard.appendChild(meta);
 
   const textEl = document.createElement('div');
-  if (heroData.type === 'drawing' && heroData.message?.startsWith('data:image/')) {
-    textEl.className = 'hero-text';
+  textEl.className = 'hero-text';
+  if (isDrawing(heroData)) {
     const img = document.createElement('img');
     img.src = heroData.message; img.alt = 'desenho';
-    img.style.cssText = 'max-width:100%;max-height:220px;object-fit:contain;border-radius:8px;background:#fff;';
+    img.style.cssText = 'max-width:100%;max-height:200px;object-fit:contain;border-radius:8px;background:#fff;';
     textEl.appendChild(img);
+    if (heroData.caption) {
+      const cap = document.createElement('div');
+      cap.className = 'board-caption';
+      cap.textContent = heroData.caption;
+      textEl.appendChild(cap);
+    }
   } else {
-    textEl.className = 'hero-text';
     textEl.textContent = heroData.message || '';
   }
   heroCard.appendChild(textEl);
@@ -447,6 +447,7 @@ function renderCurtidos() {
 
     const card = document.createElement('article');
     card.className = 'side-card';
+    card.dataset.postId = p.id;
     card.style.animationDelay = `${i * 0.12}s`;
     addCornerTicks(card, 'rgba(255,255,255,0.3)', 16);
 
@@ -461,14 +462,19 @@ function renderCurtidos() {
     card.appendChild(sideMeta);
 
     const sideText = document.createElement('div');
-    if (pd.type === 'drawing' && pd.message?.startsWith('data:image/')) {
-      sideText.className = 'side-text';
+    sideText.className = 'side-text';
+    if (isDrawing(pd)) {
       const img = document.createElement('img');
       img.src = pd.message; img.alt = 'desenho';
-      img.style.cssText = 'max-width:100%;max-height:100px;object-fit:contain;border-radius:4px;background:#fff;';
+      img.style.cssText = 'max-width:100%;max-height:90px;object-fit:contain;border-radius:4px;background:#fff;';
       sideText.appendChild(img);
+      if (pd.caption) {
+        const cap = document.createElement('div');
+        cap.className = 'board-caption';
+        cap.textContent = pd.caption;
+        sideText.appendChild(cap);
+      }
     } else {
-      sideText.className = 'side-text';
       sideText.textContent = pd.message || '';
     }
     card.appendChild(sideText);
@@ -501,7 +507,7 @@ function renderRecentes() {
   if (!sorted.length) return;
   const post = sorted[0];
   const timeStr = `POSTADO ${formatTime(post.data.createdAt)}`.toUpperCase();
-  renderBreakingCard(post, timeStr === 'POSTADO AGORA' ? 'CHEGOU AGORA MESMO' : `POSTADO HÁ ${formatTime(post.data.createdAt)}`);
+  renderBreakingCard(post, timeStr === 'POSTADO AGORA' ? 'CHEGOU AGORA MESMO' : `POSTADO HÁ ${formatTime(post.data.createdAt).toUpperCase()}`);
 }
 
 // ════════════════════════════════════════
@@ -541,11 +547,17 @@ function renderBreakingCard(post, timeStr) {
   hdr.appendChild(aInfo);
   card.appendChild(hdr);
 
-  if (d.type === 'drawing' && d.message?.startsWith('data:image/')) {
+  if (isDrawing(d)) {
     const img = document.createElement('img');
     img.className = 'breaking-drawing';
     img.src = d.message; img.alt = 'desenho';
     card.appendChild(img);
+    if (d.caption) {
+      const cap = document.createElement('div');
+      cap.className = 'board-caption';
+      cap.textContent = d.caption;
+      card.appendChild(cap);
+    }
   } else {
     const textEl = document.createElement('div');
     textEl.className = 'breaking-text';
@@ -586,19 +598,24 @@ function renderComentados() {
   const topRow = document.createElement('div');
   topRow.innerHTML = `
     <span class="comentados-label">O POST</span>
-    <span style="float:right;font-family:var(--font-mono);font-size:13px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;margin-top:4px;">${formatTime(d.createdAt)}</span>
+    <span class="comentados-timestamp">${formatTime(d.createdAt)}</span>
   `;
   postCard.appendChild(topRow);
 
   const textEl = document.createElement('div');
-  if (d.type === 'drawing' && d.message?.startsWith('data:image/')) {
-    textEl.className = 'comentados-text';
+  textEl.className = 'comentados-text';
+  if (isDrawing(d)) {
     const img = document.createElement('img');
     img.src = d.message; img.alt = 'desenho';
-    img.style.cssText = 'max-width:100%;max-height:200px;object-fit:contain;border-radius:8px;background:#fff;';
+    img.style.cssText = 'max-width:100%;max-height:180px;object-fit:contain;border-radius:8px;background:#fff;';
     textEl.appendChild(img);
+    if (d.caption) {
+      const cap = document.createElement('div');
+      cap.className = 'board-caption';
+      cap.textContent = d.caption;
+      textEl.appendChild(cap);
+    }
   } else {
-    textEl.className = 'comentados-text';
     textEl.textContent = d.message || '';
   }
   postCard.appendChild(textEl);
@@ -643,7 +660,7 @@ function renderComentados() {
 
       const bHdr = document.createElement('div');
       bHdr.className = 'reply-bubble-header';
-      bHdr.appendChild(buildAuthorChip(r.author, REPLY_GRADS[i % REPLY_GRADS.length], 28, false));
+      bHdr.appendChild(buildAuthorChip(r.author, r.gradient, 28, MOD_NAMES.has(r.author)));
       const bMeta = document.createElement('span');
       bMeta.className = 'reply-bubble-author';
       bMeta.textContent = '@' + (r.author || 'anônimo');
@@ -654,10 +671,10 @@ function renderComentados() {
       bHdr.appendChild(bTime);
       bubble.appendChild(bHdr);
 
-      if (r.type === 'drawing' && r.message?.startsWith('data:image/')) {
+      if (isDrawing(r)) {
         const img = document.createElement('img');
         img.src = r.message; img.alt = 'desenho';
-        img.style.cssText = 'max-height:40px;object-fit:contain;border-radius:4px;background:#fff;';
+        img.style.cssText = 'max-height:44px;object-fit:contain;border-radius:4px;background:#fff;';
         bubble.appendChild(img);
       } else {
         const bText = document.createElement('div');
@@ -735,11 +752,19 @@ function renderBombando() {
     const content = document.createElement('div');
     content.className = 'bombando-content';
     const bText = document.createElement('div');
-    if (d.type === 'drawing' && d.message?.startsWith('data:image/')) {
-      bText.className = 'bombando-text';
-      bText.textContent = '[desenho]';
+    bText.className = 'bombando-text';
+    if (isDrawing(d)) {
+      const img = document.createElement('img');
+      img.src = d.message; img.alt = 'desenho';
+      img.className = 'bombando-drawing-img';
+      bText.appendChild(img);
+      if (d.caption) {
+        const cap = document.createElement('span');
+        cap.className = 'board-caption';
+        cap.textContent = d.caption;
+        bText.appendChild(cap);
+      }
     } else {
-      bText.className = 'bombando-text';
       bText.textContent = d.message || '';
     }
     content.appendChild(bText);
