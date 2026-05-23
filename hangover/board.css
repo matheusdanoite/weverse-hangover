@@ -246,12 +246,18 @@ html,body {
 }
 .hero-momentum { margin-left:auto;color:var(--pink);font-weight:800; }
 .hero-text {
-  font-family:var(--font-display);
-  font-size:88px;font-weight:700;line-height:1.0;letter-spacing:-1px;
-  text-transform:uppercase;color:#fff;
-  text-shadow:0 0 24px rgba(255,45,120,0.3);
-  margin:28px 0;position:relative;max-width:68%;
+  font-family:var(--font-ui);
+  font-size:58px;font-weight:700;line-height:1.15;letter-spacing:-0.5px;
+  color:#fff;
+  text-shadow:0 0 24px rgba(255,45,120,0.25);
+  margin:28px 0;position:relative;max-width:72%;
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;
+}
+.board-caption {
+  font-family:var(--font-ui);
+  font-size:15px;font-weight:400;color:var(--text-dim);
+  margin-top:8px;letter-spacing:0.3px;font-style:italic;
+  text-transform:none;
 }
 .hero-footer { display:flex;align-items:center;gap:18px;position:relative; }
 .hero-author-info { flex:1; }
@@ -291,11 +297,11 @@ html,body {
   padding:3px 10px;font-weight:800;display:inline-block;
 }
 .side-text {
-  font-family:var(--font-display);
-  font-size:44px;line-height:1.0;letter-spacing:-0.5px;
-  font-weight:700;text-transform:uppercase;color:#fff;
-  overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;
-  position:relative;max-width:74%;
+  font-family:var(--font-ui);
+  font-size:26px;line-height:1.25;letter-spacing:-0.3px;
+  font-weight:600;color:#fff;
+  overflow:hidden;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;
+  position:relative;max-width:78%;
 }
 .side-footer { display:flex;align-items:center;gap:14px;position:relative; }
 .side-author-name { flex:1;font-size:20px;font-weight:700; }
@@ -357,9 +363,9 @@ html,body {
   letter-spacing:3px;text-transform:uppercase;font-weight:700;margin-top:2px;
 }
 .breaking-text {
-  font-family:var(--font-display);
-  font-size:108px;font-weight:700;line-height:0.95;
-  letter-spacing:-2px;text-transform:uppercase;
+  font-family:var(--font-ui);
+  font-size:72px;font-weight:700;line-height:1.1;
+  letter-spacing:-0.5px;
   background:linear-gradient(180deg,#fff 0%,var(--pink-lt) 100%);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;
@@ -390,11 +396,16 @@ html,body {
   font-family:var(--font-mono);font-size:13px;letter-spacing:2px;text-transform:uppercase;
 }
 .comentados-text {
-  font-family:var(--font-display);
-  font-size:68px;line-height:1.0;letter-spacing:-1.5px;
-  font-weight:700;text-transform:uppercase;color:#fff;
+  font-family:var(--font-ui);
+  font-size:42px;line-height:1.2;letter-spacing:-0.5px;
+  font-weight:600;color:#fff;
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;
   flex:1;
+}
+.comentados-timestamp {
+  float:right;
+  font-family:var(--font-mono);font-size:13px;color:var(--text-dim);
+  letter-spacing:2px;text-transform:uppercase;margin-top:4px;
 }
 .comentados-post-footer { display:flex;align-items:center;gap:16px; }
 .comentados-post-author { flex:1;font-size:22px;font-weight:800; }
@@ -426,9 +437,9 @@ html,body {
   font-size:11px;color:var(--text-muted);letter-spacing:1px;
 }
 .reply-bubble-text {
-  font-family:var(--font-display);
-  font-size:25px;line-height:1.1;letter-spacing:-0.3px;
-  font-weight:600;text-transform:uppercase;color:var(--text);
+  font-family:var(--font-ui);
+  font-size:17px;line-height:1.35;letter-spacing:0;
+  font-weight:400;color:var(--text);
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
 }
 .comentados-more {
@@ -455,11 +466,15 @@ html,body {
 }
 .bombando-content { min-width:0; }
 .bombando-text {
-  font-family:var(--font-display);
-  font-size:40px;line-height:1.05;letter-spacing:-0.5px;
-  font-weight:700;text-transform:uppercase;color:#fff;
+  font-family:var(--font-ui);
+  font-size:26px;line-height:1.2;letter-spacing:-0.3px;
+  font-weight:600;color:#fff;
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
-  margin-bottom:8px;
+  margin-bottom:6px;display:flex;align-items:center;gap:10px;
+}
+.bombando-drawing-img {
+  max-height:56px;object-fit:contain;
+  border-radius:4px;background:#fff;flex-shrink:0;
 }
 .bombando-author {
   display:flex;align-items:center;gap:10px;
