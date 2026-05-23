@@ -859,8 +859,56 @@ tabIdols.addEventListener('click',   () => setActiveTab('idols'));
 
 async function loadIdolProfiles() {
   try {
-    const snap = await getDocs(query(collection(db, 'hangul_usernames'), where('isIdolProfile', '==', true)));
-    idolProfiles = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // 1. Load canonical profiles already registered
+    const usernamesSnap = await getDocs(
+      query(collection(db, 'hangul_usernames'), where('isIdolProfile', '==', true))
+    );
+    const fromUsernames = usernamesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const registeredNames = new Set(fromUsernames.map(p => p.name));
+
+    // 2. Scan all idol posts to discover profiles not yet registered
+    const postsSnap = await getDocs(
+      query(collection(db, POSTS), where('isIdolPost', '==', true))
+    );
+    const discoveredMap = new Map();
+    postsSnap.docs.forEach(d => {
+      const p = d.data();
+      if (!p.author || registeredNames.has(p.author)) return;
+      const existing = discoveredMap.get(p.author);
+      // Prefer entry with avatarPhoto
+      if (!existing || (!existing.avatarPhoto && p.avatarPhoto)) {
+        discoveredMap.set(p.author, {
+          name: p.author,
+          gradient: p.gradient || ['#ff2d78', '#9b59ff'],
+          avatarPhoto: p.avatarPhoto || null,
+        });
+      }
+    });
+
+    // 3. Backfill discovered profiles into hangul_usernames for cross-admin persistence
+    const backfilledProfiles = [];
+    const backfillOps = [];
+    discoveredMap.forEach((profile, name) => {
+      const nameKey = 'idol_' + name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const localProfile = {
+        id: nameKey, name, isIdolProfile: true,
+        gradient: profile.gradient,
+        ...(profile.avatarPhoto ? { avatarPhoto: profile.avatarPhoto } : {}),
+      };
+      backfilledProfiles.push(localProfile);
+      backfillOps.push(
+        setDoc(doc(db, 'hangul_usernames', nameKey), {
+          name, isIdolProfile: true,
+          gradient: profile.gradient,
+          ...(profile.avatarPhoto ? { avatarPhoto: profile.avatarPhoto } : {}),
+          discoveredAt: serverTimestamp(),
+        }, { merge: true })
+      );
+    });
+
+    if (backfillOps.length > 0) await Promise.allSettled(backfillOps);
+
+    idolProfiles = [...fromUsernames, ...backfilledProfiles];
     renderProfileSelector();
   } catch (e) {
     console.log('Failed to load idol profiles:', e);
