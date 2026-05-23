@@ -273,10 +273,14 @@ enablePushBtn.addEventListener('click', async () => {
 
 // ── Admin Composer ──
 
-function setDefaultComposeTime() {
+function nowDatetimeLocal() {
   const now = new Date();
   const pad = n => String(n).padStart(2, '0');
-  composeCustomTime.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+
+function setDefaultComposeTime() {
+  composeCustomTime.value = nowDatetimeLocal();
 }
 
 function resetCompose() {
@@ -1149,6 +1153,27 @@ function buildRepliesSection(post, tabKey) {
   );
   composer.appendChild(profileSelectorEl);
 
+  // Scheduling row — only on the Idol tab
+  let replyTimeInput = null;
+  if (tabKey === 'idol') {
+    const timeRow = document.createElement('div');
+    timeRow.style.cssText = 'display:flex;align-items:center;gap:5px;padding:3px 0;';
+
+    const clockSvg = document.createElement('span');
+    clockSvg.style.color = 'var(--text-muted)';
+    clockSvg.style.flexShrink = '0';
+    clockSvg.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+
+    replyTimeInput = document.createElement('input');
+    replyTimeInput.type = 'datetime-local';
+    replyTimeInput.className = 'compose-custom-time';
+    replyTimeInput.value = nowDatetimeLocal();
+
+    timeRow.appendChild(clockSvg);
+    timeRow.appendChild(replyTimeInput);
+    composer.appendChild(timeRow);
+  }
+
   const inputRow = document.createElement('div');
   inputRow.style.cssText = 'display:flex;gap:6px;align-items:center;';
 
@@ -1174,6 +1199,9 @@ function buildRepliesSection(post, tabKey) {
     const replyAuthor = localReplyProfile ? localReplyProfile.name  : modProfile.name;
     const replyGrad   = localReplyProfile ? localReplyProfile.gradient : modProfile.gradient;
     const replyAvatar = localReplyProfile?.avatarPhoto || null;
+    const createdAt   = replyTimeInput?.value
+      ? Timestamp.fromDate(new Date(replyTimeInput.value))
+      : serverTimestamp();
 
     try {
       await addDoc(collection(db, POSTS, post.docId, 'replies'), {
@@ -1183,7 +1211,7 @@ function buildRepliesSection(post, tabKey) {
         gradient: replyGrad,
         ...(replyAvatar ? { avatarPhoto: replyAvatar } : {}),
         ...(localReplyProfile ? { isIdolPost: true } : {}),
-        createdAt: serverTimestamp(),
+        createdAt,
       });
       await updateDoc(doc(db, POSTS, post.docId), {
         replyCount: increment(1),
@@ -1191,6 +1219,7 @@ function buildRepliesSection(post, tabKey) {
         lastReplyText: txt.slice(0, 100),
       });
       input.value = '';
+      if (replyTimeInput) replyTimeInput.value = nowDatetimeLocal();
     } catch (err) {
       showToast('erro ao responder: ' + err.message, 'error');
     } finally {
