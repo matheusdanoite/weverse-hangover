@@ -20,8 +20,6 @@ const boardScene     = document.getElementById('boardGrid');
 const emptyState     = document.getElementById('emptyState');
 const viewLabelWrap  = document.getElementById('viewLabelWrap');
 const viewLabelText  = document.getElementById('viewLabelText');
-const tickerTrack    = document.getElementById('tickerTrack');
-
 // ── Data store ──
 const allPosts    = new Map();
 const replyUnsubs = new Map();
@@ -86,59 +84,13 @@ function formatTime(ts) {
 function likesOf(data)   { return (data.likedBy || []).length; }
 function repliesOf(data) { return data.replyCount || 0; }
 
-// ── Stats & ticker ──
-function computeStats() {
-  let totalLikes = 0, totalReplies = 0;
-  const authorCount = new Map();
-  for (const { data } of allPosts.values()) {
-    totalLikes   += likesOf(data);
-    totalReplies += repliesOf(data);
-    const a = data.author || 'anônimo';
-    authorCount.set(a, (authorCount.get(a) || 0) + 1);
-  }
-  let topAuthor = '', topCount = 0;
-  for (const [name, count] of authorCount) {
-    if (count > topCount) { topAuthor = name; topCount = count; }
-  }
-  return { totalPosts: allPosts.size, totalLikes, totalReplies, topAuthor, topCount };
-}
-
-function updateTicker() {
-  const s = computeStats();
-  const items = [
-    `${s.totalPosts} posts`,
-    `${s.totalLikes} ♥`,
-    `${s.totalReplies} respostas`,
-    s.topAuthor ? `${s.topAuthor} lidera` : null,
-    'poste agora',
-  ].filter(Boolean);
-
-  const all = [...items, ...items];
-  tickerTrack.innerHTML = '';
-  for (const text of all) {
-    const span = document.createElement('span');
-    span.className = 'ticker-item';
-    span.innerHTML = `${escapeHTML(text)}<span>★</span>`;
-    tickerTrack.appendChild(span);
-  }
-}
-
 // ── Author chip builder ──
 function buildAuthorChip(author, gradient, size, isMod) {
   const initial = (author || '?').charAt(0).toUpperCase();
   const wrap = document.createElement('div');
   wrap.className = 'author-chip';
-  wrap.style.cssText = `width:${size}px;height:${size}px;`;
-
-  const inner = document.createElement('div');
-  inner.className = 'author-chip-inner';
-  inner.style.cssText = `
-    width:${size}px;height:${size}px;
-    background:${gradientCSS(gradient)};
-    font-size:${Math.round(size * 0.4)}px;
-  `;
-  inner.textContent = initial;
-  wrap.appendChild(inner);
+  wrap.style.cssText = `width:${size}px;height:${size}px;background:${gradientCSS(gradient)};font-size:${Math.round(size * 0.4)}px;`;
+  wrap.textContent = initial;
 
   if (isMod) {
     const badge = document.createElement('div');
@@ -151,23 +103,17 @@ function buildAuthorChip(author, gradient, size, isMod) {
   return wrap;
 }
 
-// ── Corner ticks ──
-function addCornerTicks(el, color = '#ff2d78', sz = 20) {
-  const T = `2px solid ${color}`;
-  const pos = vw(10) + 'px';
-  const corners = [
-    { top:pos, left:pos,   borderTop:T, borderLeft:T   },
-    { top:pos, right:pos,  borderTop:T, borderRight:T  },
-    { bottom:pos, left:pos,  borderBottom:T, borderLeft:T  },
-    { bottom:pos, right:pos, borderBottom:T, borderRight:T },
-  ];
-  for (const styles of corners) {
-    const tick = document.createElement('div');
-    tick.className = 'ctick';
-    tick.style.width  = sz + 'px';
-    tick.style.height = sz + 'px';
-    Object.assign(tick.style, styles);
-    el.appendChild(tick);
+const SVG_REPLIES = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width:1em;height:1em;vertical-align:middle;"><path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v7a2 2 0 01-2 2H7l-4 4V5z"/></svg>`;
+
+function fitText(el, maxVw, minVw) {
+  if (el.querySelector('img')) return;
+  const W = window.innerWidth;
+  let size = maxVw * W / 100;
+  const min = minVw * W / 100;
+  el.style.fontSize = size + 'px';
+  while (size > min && el.scrollHeight > el.clientHeight) {
+    size -= 2;
+    el.style.fontSize = size + 'px';
   }
 }
 
@@ -228,7 +174,6 @@ onSnapshot(postsQ, snap => {
     clearTimeout(viewTimer);
     clearTimeout(breakingTimer);
     isReady = false; isBreaking = false;
-    updateTicker();
     return;
   }
   emptyState.classList.add('hidden');
@@ -255,8 +200,6 @@ onSnapshot(postsQ, snap => {
   const keepIds = new Set(topCommented.map(p => p.id));
   topCommented.forEach(p => ensureReplies(p.id));
   pruneReplies(keepIds);
-
-  updateTicker();
 
   if (!isReady) {
     isReady = true;
@@ -369,24 +312,18 @@ function renderCurtidos() {
   const heroCard = document.createElement('article');
   heroCard.className = 'hero-card';
   heroCard.dataset.postId = hero.id;
-  addCornerTicks(heroCard, '#ff2d78', vw(20));
 
   const heroRankEl = document.createElement('div');
   heroRankEl.className = 'hero-rank';
   heroRankEl.textContent = rankBase;
   heroCard.appendChild(heroRankEl);
 
-  const meta = document.createElement('div');
-  meta.className = 'hero-meta';
-  meta.innerHTML = `<span class="hero-momentum">↑ ${heroLikes} curtidas</span>`;
-  heroCard.appendChild(meta);
-
   const textEl = document.createElement('div');
   textEl.className = 'hero-text';
   if (isDrawing(heroData)) {
     const img = document.createElement('img');
     img.src = heroData.message; img.alt = 'desenho';
-    img.style.cssText = `max-width:100%;max-height:${vh(200)}px;object-fit:contain;border-radius:8px;background:#fff;`;
+    img.style.cssText = `max-width:100%;height:100%;object-fit:contain;border-radius:8px;background:#fff;display:block;`;
     textEl.appendChild(img);
     if (heroData.caption) {
       const cap = document.createElement('div');
@@ -404,15 +341,12 @@ function renderCurtidos() {
   footer.appendChild(buildAuthorChip(heroData.author, heroData.gradient, vw(72), heroMod));
   const authorInfo = document.createElement('div');
   authorInfo.className = 'hero-author-info';
-  authorInfo.innerHTML = `
-    <div class="hero-author-name">@${escapeHTML(heroData.author || 'anônimo')}</div>
-    <div class="hero-author-time">${formatTime(heroData.createdAt)} atrás</div>
-  `;
+  authorInfo.innerHTML = `<div class="hero-author-name">@${escapeHTML(heroData.author || 'anônimo')}</div>`;
   footer.appendChild(authorInfo);
   const counts = document.createElement('div');
   counts.className = 'hero-counts';
   counts.appendChild(buildBigCount(heroLikes, '♥', '#ff2d78'));
-  counts.appendChild(buildBigCount(heroReplies, '💬', '#9b59ff'));
+  counts.appendChild(buildBigCount(heroReplies, SVG_REPLIES, '#9b59ff'));
   footer.appendChild(counts);
   heroCard.appendChild(footer);
   boardScene.appendChild(heroCard);
@@ -433,24 +367,18 @@ function renderCurtidos() {
     card.className = 'side-card';
     card.dataset.postId = p.id;
     card.style.animationDelay = `${i * 0.12}s`;
-    addCornerTicks(card, 'rgba(255,255,255,0.3)', vw(16));
 
     const rank = document.createElement('div');
     rank.className = 'side-rank';
     rank.textContent = rankBase + i;
     card.appendChild(rank);
 
-    const sideMeta = document.createElement('div');
-    sideMeta.className = 'side-meta';
-    sideMeta.textContent = `${formatTime(pd.createdAt)} atrás`;
-    card.appendChild(sideMeta);
-
     const sideText = document.createElement('div');
     sideText.className = 'side-text';
     if (isDrawing(pd)) {
       const img = document.createElement('img');
       img.src = pd.message; img.alt = 'desenho';
-      img.style.cssText = `max-width:100%;max-height:${vh(90)}px;object-fit:contain;border-radius:4px;background:#fff;`;
+      img.style.cssText = `max-width:100%;height:100%;object-fit:contain;border-radius:4px;background:#fff;display:block;`;
       sideText.appendChild(img);
       if (pd.caption) {
         const cap = document.createElement('div');
@@ -472,13 +400,19 @@ function renderCurtidos() {
     sideFooter.appendChild(sName);
     const sCounts = document.createElement('div');
     sCounts.className = 'side-counts';
-    sCounts.innerHTML = `<span class="count-likes">♥${pLikes}</span><span class="count-replies">💬${pReplies}</span>`;
+    sCounts.innerHTML = `<span class="count-likes">♥${pLikes}</span><span class="count-replies">${SVG_REPLIES}${pReplies}</span>`;
     sideFooter.appendChild(sCounts);
     card.appendChild(sideFooter);
     rightCol.appendChild(card);
   }
 
   boardScene.appendChild(rightCol);
+
+  requestAnimationFrame(() => {
+    const ht = boardScene.querySelector('.hero-text');
+    if (ht) fitText(ht, 8, 1.8);
+    boardScene.querySelectorAll('.side-text').forEach(el => fitText(el, 4, 1.2));
+  });
 }
 
 // ════════════════════════════════════════
@@ -518,7 +452,6 @@ function renderBreakingCard(post, timeStr) {
 
   const card = document.createElement('div');
   card.className = 'breaking-card';
-  addCornerTicks(card, '#ff2d78', vw(28));
 
   const hdr = document.createElement('div');
   hdr.className = 'breaking-card-header';
@@ -577,7 +510,6 @@ function renderComentados() {
   // ── Left: original post ──
   const postCard = document.createElement('article');
   postCard.className = 'comentados-post';
-  addCornerTicks(postCard, '#00d4ff', vw(16));
 
   const topRow = document.createElement('div');
   topRow.innerHTML = `
@@ -615,7 +547,7 @@ function renderComentados() {
   pCounts.className = 'comentados-post-counts';
   pCounts.innerHTML = `
     <span style="color:var(--pink-lt);font-size:${vw(28)}px;font-family:var(--font-mono);font-weight:800;">♥${lk}</span>
-    <span style="color:var(--cyan);font-size:${vw(28)}px;font-family:var(--font-mono);font-weight:800;">💬${rc}</span>
+    <span style="color:var(--cyan);font-size:${vw(28)}px;font-family:var(--font-mono);font-weight:800;">${SVG_REPLIES}${rc}</span>
   `;
   postFooter.appendChild(pCounts);
   postCard.appendChild(postFooter);
@@ -776,7 +708,7 @@ function renderBombando() {
     bCounts.className = 'bombando-counts';
     bCounts.innerHTML = `
       <span style="color:var(--pink-lt);font-size:${vw(20)}px;">♥ ${lk}</span>
-      <span style="color:var(--text-dim);font-size:${vw(16)}px;">💬 ${rc}</span>
+      <span style="color:var(--text-dim);font-size:${vw(16)}px;">${SVG_REPLIES} ${rc}</span>
     `;
     row.appendChild(bCounts);
     boardScene.appendChild(row);
@@ -887,11 +819,3 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// ── Refresh timestamps every 30s ──
-setInterval(() => {
-  document.querySelectorAll('.hero-author-time').forEach(el => {
-    const card = el.closest('[data-post-id]');
-    const post = card && allPosts.get(card.dataset.postId);
-    if (post) el.textContent = formatTime(post.data.createdAt) + ' atrás';
-  });
-}, 30000);
