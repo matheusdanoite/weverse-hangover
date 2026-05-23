@@ -103,8 +103,10 @@ body {
 
 .brand {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 10px;
+  justify-content: center;
+  gap: 0 10px;
   user-select: none;
 }
 
@@ -125,6 +127,16 @@ body {
   letter-spacing: 5px;
   color: var(--text-muted);
   text-transform: uppercase;
+}
+
+.brand-url {
+  flex-basis: 100%;
+  text-align: center;
+  font-size: 0.65rem;
+  font-weight: 400;
+  letter-spacing: 1.5px;
+  color: rgba(255, 255, 255, 0.3);
+  margin-top: 1px;
 }
 
 /* Badge removed */
