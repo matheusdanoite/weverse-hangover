@@ -5,7 +5,7 @@ import {
 import {
   getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, setDoc,
   serverTimestamp, Timestamp, query, orderBy, onSnapshot, limit, increment,
-  getDocs, where, arrayUnion, arrayRemove,
+  getDoc, getDocs, where, arrayUnion, arrayRemove,
 } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js';
 import { getMessaging, getToken } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-messaging.js';
 import {
@@ -56,14 +56,29 @@ const maintainNoteWrap   = document.getElementById('maintainNoteWrap');
 const maintainNoteInput  = document.getElementById('maintainNoteInput');
 const maintainCancel     = document.getElementById('maintainCancel');
 const maintainOk         = document.getElementById('maintainOk');
+const tabReports          = document.getElementById('tabReports');
+const tabIdols            = document.getElementById('tabIdols');
+const idolsList           = document.getElementById('idolsList');
+const profileSelector     = document.getElementById('profileSelector');
+const profileSelectorList = document.getElementById('profileSelectorList');
+const editModalOverlay    = document.getElementById('editModalOverlay');
+const editModalText       = document.getElementById('editModalText');
+const editModalTime       = document.getElementById('editModalTime');
+const editModalCancel     = document.getElementById('editModalCancel');
+const editModalSave       = document.getElementById('editModalSave');
 
-let allPosts          = [];
-let modProfile        = null;
-let pendingConfirm    = null;
-let pendingMaintain   = null;
-let toastTimer        = null;
-let unsubscribePosts  = null;
+let allPosts            = [];
+let modProfile          = null;
+let pendingConfirm      = null;
+let pendingMaintain     = null;
+let toastTimer          = null;
+let unsubscribePosts    = null;
 let composeAvatarPhotoData = null;
+let activeTab           = 'reports';
+let idolProfiles        = [];
+let selectedIdolProfile = null;
+let pendingEdit         = null;
+let idolReplyUnsubs     = {};
 
 function getDeviceId() {
   let id = localStorage.getItem('hangul.adm.deviceId');
@@ -192,6 +207,7 @@ onAuthStateChanged(auth, async (user) => {
 
   setDefaultComposeTime();
   loadPosts();
+  loadIdolProfiles();
 
   if ('serviceWorker' in navigator && 'Notification' in window) {
     if (Notification.permission === 'default') {
@@ -330,7 +346,43 @@ composeBtn.addEventListener('click', async () => {
   composeBtn.textContent = '…';
   try {
     const customName = composeCustomName.value.trim();
+    const isIdol = !!customName;
     const author = customName || modProfile.name;
+
+    let gradient = selectedIdolProfile ? selectedIdolProfile.gradient : modProfile.gradient;
+    let avatarPhoto = composeAvatarPhotoData;
+
+    if (isIdol && !selectedIdolProfile) {
+      const nameKey = 'idol_' + customName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const existing = await getDoc(doc(db, 'hangul_usernames', nameKey));
+      if (existing.exists()) {
+        const data = existing.data();
+        if (!data.isIdolProfile) {
+          showToast('nome já em uso por outro usuário', 'error');
+          composeBtn.disabled = false;
+          composeBtn.textContent = 'postar';
+          return;
+        }
+        gradient = data.gradient || gradient;
+        avatarPhoto = avatarPhoto || data.avatarPhoto;
+      } else {
+        await setDoc(doc(db, 'hangul_usernames', nameKey), {
+          name: customName,
+          isIdolProfile: true,
+          gradient: modProfile.gradient,
+          ...(avatarPhoto ? { avatarPhoto } : {}),
+          createdBy: modProfile.id,
+          createdAt: serverTimestamp(),
+        });
+        const newProfile = {
+          id: nameKey, name: customName, isIdolProfile: true,
+          gradient: modProfile.gradient,
+          ...(avatarPhoto ? { avatarPhoto } : {}),
+        };
+        idolProfiles.push(newProfile);
+        renderProfileSelector();
+      }
+    }
 
     let createdAt;
     const timeVal = composeCustomTime.value;
@@ -343,15 +395,17 @@ composeBtn.addEventListener('click', async () => {
     const postData = {
       type: 'text', message: text,
       author, authorId: modProfile.id,
-      gradient: modProfile.gradient,
+      gradient,
       likedBy: [], likeCount: 0, replyCount: 0,
       createdAt,
-      ...(composeAvatarPhotoData ? { avatarPhoto: composeAvatarPhotoData } : {}),
-      ...(customName ? { isIdolPost: true } : {}),
+      ...(avatarPhoto ? { avatarPhoto } : {}),
+      ...(isIdol ? { isIdolPost: true } : {}),
     };
 
     await addDoc(collection(db, POSTS), postData);
+    const prevProfile = selectedIdolProfile;
     resetCompose();
+    if (prevProfile) selectIdolProfile(prevProfile);
     showToast('postado!', 'success');
   } catch (e) {
     showToast('erro ao postar: ' + e.message, 'error');
@@ -387,7 +441,8 @@ function loadPosts() {
   unsubscribePosts = onSnapshot(q,
     (snap) => {
       allPosts = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
-      renderReports();
+      if (activeTab === 'idols') renderIdols();
+      else renderReports();
     },
     (e) => {
       reportsList.innerHTML = `<div class="state-empty"><p>erro: ${escapeHTML(String(e.message || e))}</p></div>`;
@@ -398,6 +453,7 @@ function loadPosts() {
 
 // ── Render reports (inline, replaces postList) ──
 function renderReports() {
+  if (activeTab !== 'reports') return;
   const search = searchInput.value.toLowerCase().trim();
 
   if (search) {
@@ -766,3 +822,410 @@ if (toggleCountdownBtn && countdownTimeInput) {
     }
   });
 }
+
+// ═══════════════════════════════════════════════════════════════
+// ── Tabs ──
+// ═══════════════════════════════════════════════════════════════
+
+function setActiveTab(tab) {
+  activeTab = tab;
+  tabReports.classList.toggle('active', tab === 'reports');
+  tabIdols.classList.toggle('active', tab === 'idols');
+
+  reportsList.style.display    = tab === 'reports' ? '' : 'none';
+  idolsList.style.display      = tab === 'idols'   ? '' : 'none';
+  profileSelector.style.display = tab === 'idols'   ? '' : 'none';
+
+  // Hide search when switching tabs
+  searchBar.style.display = 'none';
+  searchInput.value = '';
+
+  // Hide reports label when on idols tab
+  if (tab === 'reports') {
+    renderReports();
+  } else {
+    reportsSectionLabel.style.display = 'none';
+    loadIdolProfiles();
+    renderIdols();
+  }
+}
+
+tabReports.addEventListener('click', () => setActiveTab('reports'));
+tabIdols.addEventListener('click',   () => setActiveTab('idols'));
+
+// ═══════════════════════════════════════════════════════════════
+// ── Idol Profiles ──
+// ═══════════════════════════════════════════════════════════════
+
+async function loadIdolProfiles() {
+  try {
+    const snap = await getDocs(query(collection(db, 'hangul_usernames'), where('isIdolProfile', '==', true)));
+    idolProfiles = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderProfileSelector();
+  } catch (e) {
+    console.log('Failed to load idol profiles:', e);
+  }
+}
+
+function renderProfileSelector() {
+  profileSelectorList.innerHTML = '';
+
+  idolProfiles.forEach(profile => {
+    const pill = document.createElement('button');
+    pill.className = 'profile-pill' + (selectedIdolProfile?.id === profile.id ? ' active' : '');
+    pill.type = 'button';
+
+    const avatarEl = document.createElement('div');
+    avatarEl.className = 'profile-pill-avatar';
+    if (profile.avatarPhoto) {
+      avatarEl.style.backgroundImage = `url(${profile.avatarPhoto})`;
+      avatarEl.style.backgroundSize = 'cover';
+    } else {
+      avatarEl.style.backgroundImage = gradientCSS(profile.gradient || ['#ff2d78', '#9b59ff']);
+    }
+
+    pill.appendChild(avatarEl);
+    pill.appendChild(document.createTextNode(profile.name));
+    pill.addEventListener('click', () => selectIdolProfile(profile));
+    profileSelectorList.appendChild(pill);
+  });
+
+  const newPill = document.createElement('button');
+  newPill.className = 'profile-pill profile-pill-new' + (selectedIdolProfile === null && idolProfiles.length > 0 ? ' active' : '');
+  newPill.type = 'button';
+  newPill.textContent = '+ novo perfil';
+  newPill.addEventListener('click', () => selectIdolProfile(null));
+  profileSelectorList.appendChild(newPill);
+}
+
+function selectIdolProfile(profile) {
+  selectedIdolProfile = profile;
+  renderProfileSelector();
+
+  if (profile) {
+    composeCustomName.value = profile.name;
+    composeCustomName.readOnly = true;
+    composeCustomName.style.opacity = '.7';
+
+    if (profile.avatarPhoto) {
+      composeAvatarPhotoData = profile.avatarPhoto;
+      composeAvatar.style.backgroundImage = `url(${profile.avatarPhoto})`;
+      composeAvatar.style.backgroundSize = 'cover';
+      composeAvatarBtn.classList.add('has-photo');
+    } else {
+      composeAvatarPhotoData = null;
+      composeAvatar.style.backgroundImage = gradientCSS(profile.gradient || modProfile.gradient);
+      composeAvatar.style.backgroundSize = '130% 130%';
+      composeAvatarBtn.classList.remove('has-photo');
+    }
+  } else {
+    composeCustomName.value = '';
+    composeCustomName.readOnly = false;
+    composeCustomName.style.opacity = '';
+    composeAvatarPhotoData = null;
+    if (modProfile) {
+      composeAvatar.style.backgroundImage = gradientCSS(modProfile.gradient);
+      composeAvatar.style.backgroundSize = '130% 130%';
+    }
+    composeAvatar.style.backgroundPosition = 'center center';
+    composeAvatarBtn.classList.remove('has-photo');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ── Idols Tab — Post list ──
+// ═══════════════════════════════════════════════════════════════
+
+function renderIdols() {
+  if (activeTab !== 'idols') return;
+
+  const idolPosts = allPosts
+    .filter(p => p.isIdolPost === true)
+    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+
+  // Remember which reply sections are currently open
+  const openSections = new Set();
+  idolsList.querySelectorAll('.idol-post-wrap[data-post-id]').forEach(wrap => {
+    const content = wrap.querySelector('.idol-replies-content');
+    if (content && content.style.display !== 'none') openSections.add(wrap.dataset.postId);
+  });
+
+  // Unsubscribe all reply listeners (DOM is being rebuilt)
+  Object.values(idolReplyUnsubs).forEach(fn => fn?.());
+  idolReplyUnsubs = {};
+
+  idolsList.innerHTML = '';
+
+  if (idolPosts.length === 0) {
+    idolsList.innerHTML = '<div class="state-empty"><p>nenhum post idol ainda</p></div>';
+    return;
+  }
+
+  idolPosts.forEach(post => {
+    const wrap = buildIdolItem(post);
+    idolsList.appendChild(wrap);
+    if (openSections.has(post.docId)) {
+      wrap.querySelector('.idol-replies-toggle')?.click();
+    }
+  });
+}
+
+function buildIdolItem(post) {
+  const wrap = document.createElement('div');
+  wrap.className = 'idol-post-wrap';
+  wrap.dataset.postId = post.docId;
+
+  const card = buildPostCard(post.docId, post, {
+    me: modProfile,
+    modNames: MOD_NAMES,
+    formatTimeFn: formatTimeAbs,
+  });
+  wrap.appendChild(card);
+
+  const actionBar = document.createElement('div');
+  actionBar.className = 'idol-action-bar';
+
+  const editBtn = document.createElement('button');
+  editBtn.className = 'btn-idol-edit';
+  editBtn.type = 'button';
+  editBtn.textContent = 'Editar';
+  editBtn.addEventListener('click', () => openEditModal(post));
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'btn-idol-del';
+  delBtn.type = 'button';
+  delBtn.textContent = 'Deletar';
+  delBtn.addEventListener('click', () => {
+    openConfirm(
+      'Deletar post idol?',
+      `De @${post.author || 'anônimo'}. Ação permanente.`,
+      async () => {
+        try {
+          await deleteDoc(doc(db, POSTS, post.docId));
+          showToast('post deletado', 'success');
+        } catch (e) {
+          showToast('erro: ' + e.message, 'error');
+        }
+      }
+    );
+  });
+
+  actionBar.appendChild(editBtn);
+  actionBar.appendChild(delBtn);
+  wrap.appendChild(actionBar);
+  wrap.appendChild(buildIdolRepliesSection(post));
+
+  return wrap;
+}
+
+function buildIdolRepliesSection(post) {
+  const section = document.createElement('div');
+  section.className = 'idol-replies-section';
+
+  const toggle = document.createElement('button');
+  toggle.className = 'idol-replies-toggle';
+  toggle.type = 'button';
+  toggle.innerHTML = `
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+    </svg>
+    <span>${post.replyCount || 0} respostas</span>`;
+  section.appendChild(toggle);
+
+  const content = document.createElement('div');
+  content.className = 'idol-replies-content';
+  content.style.display = 'none';
+
+  const thread = document.createElement('div');
+  thread.className = 'idol-replies-thread';
+  thread.innerHTML = '<div class="replies-empty">carregando…</div>';
+  content.appendChild(thread);
+
+  // Reply composer
+  const composer = document.createElement('div');
+  composer.className = 'idol-reply-composer';
+
+  const input = document.createElement('input');
+  input.className = 'idol-reply-input';
+  input.type = 'text';
+  input.placeholder = 'responder…';
+  input.maxLength = 300;
+
+  const sendBtn = document.createElement('button');
+  sendBtn.className = 'idol-reply-send';
+  sendBtn.type = 'button';
+  sendBtn.textContent = 'enviar';
+  sendBtn.disabled = true;
+
+  input.addEventListener('input', () => { sendBtn.disabled = !input.value.trim(); });
+
+  const submitReply = async () => {
+    const txt = input.value.trim();
+    if (!txt || !modProfile) return;
+    sendBtn.disabled = true;
+
+    const replyAuthor  = selectedIdolProfile ? selectedIdolProfile.name  : modProfile.name;
+    const replyGrad    = selectedIdolProfile ? selectedIdolProfile.gradient : modProfile.gradient;
+    const replyAvatar  = selectedIdolProfile?.avatarPhoto || null;
+
+    try {
+      await addDoc(collection(db, POSTS, post.docId, 'replies'), {
+        message: txt,
+        author: replyAuthor,
+        authorId: modProfile.id,
+        gradient: replyGrad,
+        ...(replyAvatar ? { avatarPhoto: replyAvatar } : {}),
+        ...(selectedIdolProfile ? { isIdolPost: true } : {}),
+        createdAt: serverTimestamp(),
+      });
+      await updateDoc(doc(db, POSTS, post.docId), {
+        replyCount: increment(1),
+        lastReplyAuthor: replyAuthor,
+        lastReplyText: txt.slice(0, 100),
+      });
+      input.value = '';
+    } catch (err) {
+      showToast('erro ao responder: ' + err.message, 'error');
+    } finally {
+      sendBtn.disabled = true;
+    }
+  };
+
+  sendBtn.addEventListener('click', submitReply);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submitReply(); } });
+
+  composer.appendChild(input);
+  composer.appendChild(sendBtn);
+  content.appendChild(composer);
+  section.appendChild(content);
+
+  toggle.addEventListener('click', () => {
+    const isOpen = content.style.display !== 'none';
+    if (isOpen) {
+      content.style.display = 'none';
+      toggle.classList.remove('open');
+    } else {
+      content.style.display = '';
+      toggle.classList.add('open');
+      if (!idolReplyUnsubs[post.docId]) {
+        const q = query(collection(db, POSTS, post.docId, 'replies'), orderBy('createdAt', 'asc'), limit(50));
+        idolReplyUnsubs[post.docId] = onSnapshot(q, snap => {
+          renderIdolReplyThread(thread, snap, post.docId);
+          const span = toggle.querySelector('span');
+          if (span) span.textContent = `${snap.size} respostas`;
+        });
+      }
+    }
+  });
+
+  return section;
+}
+
+function renderIdolReplyThread(thread, snap, postId) {
+  thread.innerHTML = '';
+  if (snap.empty) {
+    thread.innerHTML = '<div class="replies-empty">nenhuma resposta ainda</div>';
+    return;
+  }
+  snap.forEach(d => {
+    const r = d.data();
+    const grad = r.gradient?.length === 2 ? gradientCSS(r.gradient) : gradientCSS(['#ff2d78', '#9b59ff']);
+
+    const item = document.createElement('div');
+    item.className = 'idol-reply-item';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'idol-reply-avatar';
+    if (r.avatarPhoto) {
+      avatar.style.backgroundImage = `url(${r.avatarPhoto})`;
+      avatar.style.backgroundSize = 'cover';
+    } else {
+      avatar.style.backgroundImage = grad;
+    }
+
+    const body = document.createElement('div');
+    body.className = 'idol-reply-body';
+    body.innerHTML = `
+      <div class="idol-reply-meta">
+        <span class="idol-reply-author">${escapeHTML(r.author || 'anônimo')}</span>
+        <span>${formatTimeAbs(r.createdAt)}</span>
+      </div>
+      <div class="idol-reply-text">${escapeHTML(r.message || '')}</div>`;
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'idol-reply-del';
+    delBtn.textContent = '✕';
+    delBtn.title = `deletar resposta de @${r.author || 'anônimo'}`;
+    delBtn.addEventListener('click', async () => {
+      if (!confirm(`Deletar resposta de @${r.author || 'anônimo'}?`)) return;
+      try {
+        await deleteDoc(doc(db, POSTS, postId, 'replies', d.id));
+        showToast('resposta deletada', 'success');
+      } catch (err) {
+        showToast('erro: ' + err.message, 'error');
+      }
+    });
+
+    item.appendChild(avatar);
+    item.appendChild(body);
+    item.appendChild(delBtn);
+    thread.appendChild(item);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ── Edit Modal ──
+// ═══════════════════════════════════════════════════════════════
+
+function openEditModal(post) {
+  editModalText.value = post.message || '';
+  if (post.createdAt?.seconds) {
+    const d = new Date(post.createdAt.seconds * 1000);
+    const pad = n => String(n).padStart(2, '0');
+    editModalTime.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } else {
+    editModalTime.value = '';
+  }
+  editModalSave.disabled = false;
+  pendingEdit = { docId: post.docId };
+  editModalOverlay.classList.remove('hidden');
+  setTimeout(() => editModalText.focus(), 50);
+}
+
+editModalText.addEventListener('input', () => {
+  editModalSave.disabled = !editModalText.value.trim();
+});
+
+editModalCancel.addEventListener('click', () => {
+  editModalOverlay.classList.add('hidden');
+  pendingEdit = null;
+});
+
+editModalSave.addEventListener('click', async () => {
+  if (!pendingEdit) return;
+  const newText = editModalText.value.trim();
+  if (!newText) return;
+  editModalSave.disabled = true;
+  try {
+    const updateData = { message: newText };
+    if (editModalTime.value) {
+      updateData.createdAt = Timestamp.fromDate(new Date(editModalTime.value));
+    }
+    await updateDoc(doc(db, POSTS, pendingEdit.docId), updateData);
+
+    const post = allPosts.find(p => p.docId === pendingEdit.docId);
+    if (post) {
+      post.message = newText;
+      if (editModalTime.value) post.createdAt = updateData.createdAt;
+    }
+
+    editModalOverlay.classList.add('hidden');
+    pendingEdit = null;
+    showToast('post atualizado', 'success');
+    renderIdols();
+  } catch (e) {
+    showToast('erro ao salvar: ' + e.message, 'error');
+  } finally {
+    editModalSave.disabled = false;
+  }
+});

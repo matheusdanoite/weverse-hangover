@@ -256,6 +256,64 @@
       outline: none; transition: border-color .2s; margin-bottom: 16px;
     }
     .maintain-textarea:focus { border-color: var(--green); }
+
+    /* ── Tabs ── */
+    .tab-bar { display: flex; gap: 4px; margin-bottom: 14px; background: var(--surface-1); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 4px; }
+    .tab-btn { flex: 1; padding: 7px; border-radius: 7px; font-size: .82rem; font-weight: 600; color: var(--text-muted); background: transparent; transition: background .15s, color .15s; cursor: pointer; }
+    .tab-btn.active { background: var(--surface-2); color: var(--text-primary); }
+
+    /* ── Profile selector ── */
+    .profile-selector { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle); }
+    .profile-selector-label { font-size: .68rem; letter-spacing: .1em; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; }
+    .profile-selector-list { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; }
+    .profile-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 20px; background: var(--surface-2); border: 1px solid var(--border-subtle); font-size: .78rem; color: var(--text-secondary); cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+    .profile-pill:hover { background: var(--surface-hover); }
+    .profile-pill.active { background: rgba(155,89,255,.15); border-color: var(--purple-accent); color: var(--purple-accent); }
+    .profile-pill-avatar { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; background-size: 130% 130%; background-position: center; }
+    .profile-pill.active .profile-pill-avatar { background-size: cover; }
+    .profile-pill-new { color: var(--text-muted); border-style: dashed; }
+
+    /* ── Idol list ── */
+    .idol-post-wrap { display: flex; flex-direction: column; gap: 6px; }
+    .idol-action-bar { display: flex; gap: 8px; }
+    .btn-idol-edit { flex: 1; background: rgba(0,212,255,.07); border: 1px solid rgba(0,212,255,.22); color: #00d4ff; padding: 8px 14px; border-radius: 10px; font-size: .82rem; font-weight: 600; transition: background .15s; cursor: pointer; }
+    .btn-idol-edit:hover { background: rgba(0,212,255,.16); }
+    .btn-idol-del { flex: 1; background: rgba(255,59,59,.07); border: 1px solid rgba(255,59,59,.22); color: var(--red); padding: 8px 14px; border-radius: 10px; font-size: .82rem; font-weight: 600; transition: background .15s; cursor: pointer; }
+    .btn-idol-del:hover { background: rgba(255,59,59,.16); }
+
+    /* ── Inline replies (Idols tab) ── */
+    .idol-replies-section { background: var(--surface-1); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 10px 12px; }
+    .idol-replies-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; color: var(--text-muted); cursor: pointer; background: none; border: none; padding: 0; }
+    .idol-replies-toggle.open { color: var(--purple-accent); }
+    .idol-replies-thread { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .idol-reply-item { display: flex; gap: 8px; align-items: flex-start; }
+    .idol-reply-avatar { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; background-size: 130% 130%; background-position: center; }
+    .idol-reply-body { flex: 1; min-width: 0; }
+    .idol-reply-meta { font-size: .72rem; color: var(--text-muted); margin-bottom: 2px; }
+    .idol-reply-author { color: var(--text-primary); font-weight: 600; margin-right: 5px; }
+    .idol-reply-text { font-size: .85rem; color: var(--text-primary); word-break: break-word; }
+    .idol-reply-del { background: none; border: none; color: var(--text-muted); font-size: .7rem; padding: 2px 4px; cursor: pointer; opacity: .45; flex-shrink: 0; }
+    .idol-reply-del:hover { opacity: 1; color: var(--red); }
+    .idol-reply-composer { display: flex; gap: 6px; align-items: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-subtle); }
+    .idol-reply-input { flex: 1; background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-primary); padding: 7px 10px; font-size: .82rem; font-family: inherit; outline: none; transition: border-color .2s; }
+    .idol-reply-input:focus { border-color: var(--purple-accent); }
+    .idol-reply-input::placeholder { color: var(--text-muted); }
+    .idol-reply-send { background: var(--purple-accent); color: #fff; padding: 7px 14px; border-radius: 8px; font-size: .78rem; font-weight: 700; flex-shrink: 0; transition: opacity .15s; cursor: pointer; }
+    .idol-reply-send:disabled { opacity: .35; cursor: not-allowed; }
+
+    /* ── Edit modal ── */
+    .edit-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.72); display: flex; align-items: center; justify-content: center; z-index: 9999; backdrop-filter: blur(4px); }
+    .edit-modal-card { background: #1e0d35; border: 1px solid var(--border-strong); border-radius: 16px; padding: 24px; max-width: 380px; width: 90%; display: flex; flex-direction: column; gap: 12px; }
+    .edit-modal-title { font-size: 1rem; font-weight: 700; }
+    .edit-modal-textarea { width: 100%; background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-primary); padding: 10px 12px; font-size: .88rem; font-family: inherit; line-height: 1.4; resize: none; min-height: 90px; outline: none; transition: border-color .2s; }
+    .edit-modal-textarea:focus { border-color: var(--purple-accent); }
+    .edit-modal-time { background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-muted); padding: 9px 12px; font-size: .82rem; font-family: inherit; outline: none; width: 100%; transition: border-color .2s; }
+    .edit-modal-time::-webkit-calendar-picker-indicator { filter: invert(.5); cursor: pointer; }
+    .edit-modal-time:focus { border-color: var(--purple-accent); }
+    .edit-modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .btn-edit-cancel { background: var(--surface-2); border: 1px solid var(--border-subtle); color: var(--text-secondary); padding: 8px 18px; border-radius: 8px; font-size: .85rem; cursor: pointer; }
+    .btn-edit-save { background: var(--purple-accent); color: #fff; padding: 8px 18px; border-radius: 8px; font-size: .85rem; font-weight: 700; cursor: pointer; transition: opacity .15s; }
+    .btn-edit-save:disabled { opacity: .4; cursor: not-allowed; }
   </style>
 </head>
 
@@ -307,9 +365,18 @@
       <input type="search" id="searchInput" class="search-input" style="width:100%; box-sizing:border-box;" placeholder="buscar por autor ou conteúdo…" />
     </div>
 
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tabReports">Denúncias</button>
+      <button class="tab-btn" id="tabIdols">Idols</button>
+    </div>
+
     <!-- Composer -->
     <section class="compose-section">
       <input type="file" id="composeAvatarInput" accept="image/*" style="display:none">
+      <div id="profileSelector" class="profile-selector" style="display:none;">
+        <div class="profile-selector-label">postar como:</div>
+        <div id="profileSelectorList" class="profile-selector-list"></div>
+      </div>
       <div class="compose-row">
         <div class="compose-avatar-btn" id="composeAvatarBtn" title="Clique para selecionar foto de perfil">
           <div class="compose-avatar" id="composeAvatar"></div>
@@ -349,6 +416,7 @@
       <span class="reports-count-badge" id="postsCountTools"></span>
     </div>
     <div id="reportsList" class="post-list"></div>
+    <div id="idolsList" class="post-list" style="display:none;"></div>
 
     <div id="countdownSettingsPanel" style="margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border-subtle); display: flex; flex-direction: column; align-items: center; gap: 12px;">
       <h3 style="font-size: 1rem; color: var(--pink-neon);">Contagem Regressiva</h3>
@@ -402,6 +470,19 @@
       <div class="confirm-actions">
         <button id="maintainCancel" class="btn-cancel">cancelar</button>
         <button id="maintainOk" class="btn-confirm-maintain">manter</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit modal -->
+  <div id="editModalOverlay" class="edit-modal-overlay hidden">
+    <div class="edit-modal-card">
+      <div class="edit-modal-title">Editar post</div>
+      <textarea id="editModalText" class="edit-modal-textarea" maxlength="300" placeholder="texto do post…"></textarea>
+      <input type="datetime-local" id="editModalTime" class="edit-modal-time">
+      <div class="edit-modal-actions">
+        <button id="editModalCancel" class="btn-edit-cancel">cancelar</button>
+        <button id="editModalSave" class="btn-edit-save">salvar</button>
       </div>
     </div>
   </div>
