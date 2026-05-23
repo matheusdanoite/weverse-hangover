@@ -569,8 +569,7 @@ const drawControls = document.getElementById('drawControls');
 const eraserBtn = document.getElementById('eraserBtn');
 const rainbowBtn = document.getElementById('rainbowBtn');
 const brushSizeSlider = document.getElementById('brushSize');
-const drawCaption = document.getElementById('drawCaption');
-const drawCaptionCount = document.getElementById('drawCaptionCount');
+
 
 const CANVAS_W = 600;
 const CANVAS_H = 800;
@@ -687,9 +686,7 @@ brushSizeSlider.addEventListener('input', () => {
   brushRadius = Number(brushSizeSlider.value);
 });
 
-drawCaption.addEventListener('input', () => {
-  drawCaptionCount.textContent = drawCaption.value.length;
-});
+
 
 toggleDraw.addEventListener('click', () => {
   if (inputMode === 'text') {
@@ -710,8 +707,7 @@ toggleDraw.addEventListener('click', () => {
     deactivateRainbow();
     isEraser = false;
     eraserBtn.classList.remove('eraser-active');
-    drawCaption.value = '';
-    drawCaptionCount.textContent = '0';
+
     messageField.focus();
   }
   updateToggleIcon();
@@ -798,7 +794,6 @@ async function handleSubmit() {
       }
     }
 
-    const captionText = inputMode === 'draw' ? (drawCaption.value.trim() || null) : null;
     const docData = {
       type: inputMode === 'text' ? 'text' : 'drawing',
       message,
@@ -808,19 +803,16 @@ async function handleSubmit() {
       likedBy: [],
       replyCount: 0,
       createdAt: serverTimestamp(),
-      ...(captionText ? { caption: captionText } : {}),
     };
     const postRef = await addDoc(collection(db, POSTS), docData);
     if (inputMode === 'text') writeMentions(message, postRef.id, 'post');
-    else if (captionText) writeMentions(captionText, postRef.id, 'post');
 
     messageField.value = '';
     messageField.style.height = 'auto';
     charCount.textContent = '0';
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-    drawCaption.value = '';
-    drawCaptionCount.textContent = '0';
+
 
     if (inputMode === 'draw') toggleDraw.click();
 

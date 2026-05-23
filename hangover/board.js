@@ -42,6 +42,20 @@ let isOverlayActive = false;
 
 const BUFFER_AHEAD_PX = 1500;
 
+function getActualHeight(el) {
+  const oA = el.style.animation;
+  const oT = el.style.transform;
+  const oTr = el.style.transition;
+  el.style.animation = 'none';
+  el.style.transform = 'none';
+  el.style.transition = 'none';
+  const h = el.getBoundingClientRect().height;
+  el.style.animation = oA;
+  el.style.transform = oT;
+  el.style.transition = oTr;
+  return h;
+}
+
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -78,7 +92,7 @@ function buildCard(id, data, isNew = false) {
     : '';
 
   let textClass = 'text-md';
-  if (!isDrawing && data.message) {
+  if (!isDrawing && typeof data.message === 'string') {
     const len = data.message.length;
     if (len < 30) textClass = 'text-xl';
     else if (len < 70) textClass = 'text-lg';
@@ -88,7 +102,7 @@ function buildCard(id, data, isNew = false) {
 
   const contentHTML = isDrawing
     ? (drawingSrc
-      ? `<img class="card-drawing" src="${drawingSrc}" alt="desenho" loading="lazy" />${data.caption ? `<div class="card-caption">${highlightMentions(escapeHTML(data.caption))}</div>` : ''}`
+      ? `<img class="card-drawing" src="${drawingSrc}" alt="desenho" loading="lazy" />`
       : '')
     : `<div class="card-text ${textClass}">${highlightMentions(escapeHTML(data.message || ''))}</div>`;
 
@@ -96,10 +110,18 @@ function buildCard(id, data, isNew = false) {
   el.className = `board-card`;
   el.dataset.id = id;
 
+  const authorName = data.author || 'anônimo';
+  const nameLen = authorName.length;
+  let nameStyle = '';
+  if (nameLen > 14) {
+    const scale = Math.max(0.65, 0.95 - (nameLen - 14) * 0.025);
+    nameStyle = `style="font-size: ${scale}rem;"`;
+  }
+
   el.innerHTML = `
     <div class="card-header">
       <div class="card-avatar" style="background-image:${grad};${avatarBgExtra}"></div>
-      <span class="card-author">${escapeHTML(data.author || 'anônimo')}</span>
+      <span class="card-author" ${nameStyle}>${escapeHTML(authorName)}</span>
       ${isMod ? '<span class="card-mod-star">★</span>' : ''}
     </div>
     ${contentHTML}
@@ -112,7 +134,7 @@ function buildCard(id, data, isNew = false) {
           stroke-linecap="round" stroke-linejoin="round">
           <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
         </svg>
-        ${likeCount}
+        <span class="stat-num">${likeCount}</span>
       </span>
       <span class="card-stat">
         <svg width="14" height="14" viewBox="0 0 24 24"
@@ -120,7 +142,7 @@ function buildCard(id, data, isNew = false) {
           stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
         </svg>
-        ${replyCount}
+        <span class="stat-num">${replyCount}</span>
       </span>
     </div>
     `}
@@ -206,7 +228,7 @@ function checkAndFeedColumn(i) {
     const cards = col.children;
     while (cards.length > 0) {
       const firstCard = cards[0];
-      const hExact = firstCard.getBoundingClientRect().height;
+      const hExact = getActualHeight(firstCard);
       const cardBottom = firstCard.offsetTop + hExact;
       if (cardBottom < state.scroll - 1000) {
         const h = hExact + 16;
@@ -232,7 +254,7 @@ function checkAndFeedColumn(i) {
       if (post) {
         const card = buildCard(post[0], post[1]);
         col.insertBefore(card, col.firstChild);
-        const h = card.getBoundingClientRect().height + 16;
+        const h = getActualHeight(card) + 16;
         state.scroll -= h;
       }
     }
@@ -258,7 +280,7 @@ function removeCardSmoothly(id) {
     const colIndex = columns.indexOf(col);
     const state = colState[colIndex];
     
-    const hExact = card.getBoundingClientRect().height;
+    const hExact = getActualHeight(card);
     const h = hExact + 16;
     const cardBottom = card.offsetTop + hExact;
     const cardTop = card.offsetTop;
@@ -371,20 +393,20 @@ onSnapshot(q, (snap) => {
         if (likeStat) {
           likeStat.classList.toggle('has-likes', likeCount > 0);
           likeStat.querySelector('svg').setAttribute('fill', likeCount > 0 ? 'currentColor' : 'none');
-          const oldText = likeStat.lastChild.textContent;
-          const newText = ' ' + likeCount;
-          if (oldText !== newText) {
-            likeStat.lastChild.textContent = newText;
+          const statNumEl = likeStat.querySelector('.stat-num');
+          const newText = likeCount.toString();
+          if (statNumEl && statNumEl.textContent !== newText) {
+            statNumEl.textContent = newText;
             likeStat.classList.add('pop');
             setTimeout(() => likeStat.classList.remove('pop'), 300);
           }
         }
         const replyStat = card.querySelectorAll('.card-stat')[1];
         if (replyStat) {
-          const oldText = replyStat.lastChild.textContent;
-          const newText = ' ' + replyCount;
-          if (oldText !== newText) {
-            replyStat.lastChild.textContent = newText;
+          const statNumEl = replyStat.querySelector('.stat-num');
+          const newText = replyCount.toString();
+          if (statNumEl && statNumEl.textContent !== newText) {
+            statNumEl.textContent = newText;
             replyStat.classList.add('pop');
             setTimeout(() => replyStat.classList.remove('pop'), 300);
           }
@@ -413,7 +435,7 @@ onSnapshot(q, (snap) => {
           if (!post) break;
           const card = buildCard(post[0], post[1]);
           columns[i].appendChild(card);
-          h += card.offsetHeight + 16;
+          h += getActualHeight(card) + 16;
         }
       }
     }
