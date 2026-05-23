@@ -1129,6 +1129,7 @@ function initReplySection(id, postEl) {
         replyCount: increment(1),
         lastReplyAuthor: me.name,
         lastReplyText: txt.slice(0, 100),
+        lastReplyGradient: me.gradient,
         replyUniqueAuthors: arrayUnion(me.id),
       });
       writeMentions(txt, id, 'reply');
@@ -1846,7 +1847,8 @@ function renderNotifList() {
       const preview = data.lastReplyText
         ? data.lastReplyText.slice(0, 100)
         : postPreviewText;
-      items.push({ id, postDate, hasNew, icon: chatSVG, type: 'comment', avatarName: author, extra, textHTML, isDrawing, drawingSrc, preview });
+      const replyGradient = data.lastReplyGradient || null;
+      items.push({ id, postDate, hasNew, icon: chatSVG, type: 'comment', avatarName: author, extra, textHTML, isDrawing, drawingSrc, preview, likerGradient: replyGradient });
     }
 
     const isRemoved = reportCount >= 7 && reportCount > maintainCount;
@@ -1903,7 +1905,7 @@ function renderNotifList() {
         }
       }
       const grad = likerGradient ? gradientCSS(likerGradient) : nameGradient(avatarName);
-      avatarsHTML += `<div class="notif-avatar" style="background-image:${grad}">${escapeHTML(avatarName.charAt(0).toUpperCase())}</div>`;
+      avatarsHTML += `<div class="notif-avatar" style="background-image:${grad}"></div>`;
       if (type !== 'like' && extra > 0) avatarsHTML += `<div class="notif-avatar notif-avatar-more">+${extra}</div>`;
     }
 
@@ -2115,6 +2117,7 @@ function wireLightboxComposer(composerEl, postId) {
         replyCount: increment(1),
         lastReplyAuthor: me.name,
         lastReplyText: txt.slice(0, 100),
+        lastReplyGradient: me.gradient,
         replyUniqueAuthors: arrayUnion(me.id),
       });
       writeMentions(txt, postId, 'reply');
