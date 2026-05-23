@@ -43,7 +43,7 @@ function getLightbox() {
   return ov;
 }
 
-export function openLightbox(src, { onOpen, onClose, caption, author, gradient } = {}) {
+export function openLightbox(src, { onOpen, onClose, caption, author, gradient, avatarPhoto } = {}) {
   const lb = getLightbox();
   lb.querySelector('.lightbox-img').src = src;
   const captionEl = lb.querySelector('.lightbox-caption');
@@ -57,9 +57,15 @@ export function openLightbox(src, { onOpen, onClose, caption, author, gradient }
   const authorEl = lb.querySelector('.lightbox-author');
   if (author) {
     const avatarEl = authorEl.querySelector('.lightbox-author-avatar');
-    avatarEl.style.backgroundImage = gradientCSS(gradient?.length === 2 ? gradient : null);
-    avatarEl.style.backgroundSize = '130% 130%';
-    avatarEl.style.backgroundPosition = 'center center';
+    if (avatarPhoto) {
+      avatarEl.style.backgroundImage = `url(${avatarPhoto})`;
+      avatarEl.style.backgroundSize = 'cover';
+      avatarEl.style.backgroundPosition = 'center center';
+    } else {
+      avatarEl.style.backgroundImage = gradientCSS(gradient?.length === 2 ? gradient : null);
+      avatarEl.style.backgroundSize = '130% 130%';
+      avatarEl.style.backgroundPosition = 'center center';
+    }
     authorEl.querySelector('.lightbox-author-name').textContent = author;
     authorEl.classList.remove('hidden');
   } else {
@@ -75,6 +81,7 @@ export function openLightbox(src, { onOpen, onClose, caption, author, gradient }
       <button class="lightbox-reply-send reply-send" type="button" disabled>${_SEND_SVG}</button>
     </div>
   `;
+  if (_lightboxOnClose) { _lightboxOnClose(); _lightboxOnClose = null; }
   _lightboxOnClose = onClose || null;
   lb.classList.add('open');
   if (onOpen) onOpen(repliesArea.querySelector('.lightbox-thread'), repliesArea.querySelector('.lightbox-composer'), actionsEl);
@@ -162,7 +169,12 @@ export function buildPostCard(id, data, opts = {}) {
   const isMod  = modNames.has(data.author);
   const isMine = data.authorId === me?.id;
   const reported = (data.reportedBy || []).includes(me?.id);
-  const grad   = gradientCSS(data.gradient?.length === 2 ? data.gradient : null);
+  const grad   = data.avatarPhoto
+    ? `url(${data.avatarPhoto})`
+    : gradientCSS(data.gradient?.length === 2 ? data.gradient : null);
+  const avatarBgExtra = data.avatarPhoto
+    ? 'background-size:cover;background-position:center center'
+    : 'background-size:130% 130%;background-position:center center';
 
   const drawingSrc = isDrawing && typeof data.message === 'string' &&
     /^data:image\/(png|jpeg|gif|webp);base64,/.test(data.message)
@@ -178,7 +190,7 @@ export function buildPostCard(id, data, opts = {}) {
   el.dataset.id = id;
 
   el.innerHTML = `
-    <div class="avatar avatar-md" style="background-image:${grad};background-size:130% 130%;background-position:center center"></div>
+    <div class="avatar avatar-md" style="background-image:${grad};${avatarBgExtra}"></div>
     <div class="post-body">
       <div class="post-header">
         <span class="post-author">${escapeHTML(data.author || 'anônimo')}</span>

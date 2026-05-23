@@ -207,7 +207,6 @@ onboardSubmit.addEventListener('click', async () => {
     onboardOverlay.classList.add('hidden');
     paintUserUI();
     listenMentions();
-    updateReplyCcomposersGradient();
   } finally {
     onboardSubmit.disabled = !termsCheck.checked;
     onboardSubmit.textContent = 'entrar ✦';
@@ -283,7 +282,6 @@ onAuthStateChanged(auth, async (user) => {
     onboardOverlay.classList.add('hidden');
     paintUserUI();
     listenMentions();
-    updateReplyCcomposersGradient();
     try {
       await setDoc(doc(db, USERS, profile.name), {
         userId: profile.id,
@@ -1007,52 +1005,13 @@ function buildPostElement(id, data) {
 }
 
 function buildDrawingTile(id, data) {
-  const liked = (data.likedBy || []).includes(me?.id);
-  const likeCount = (data.likedBy || []).length;
   const el = document.createElement('div');
   el.className = 'drawing-tile';
   el.dataset.id = id;
-  el.innerHTML = `
-    <div class="tile-like-bar">
-      <button class="tile-like-btn${liked ? ' liked' : ''}" type="button">
-        <svg width="14" height="14" viewBox="0 0 24 24"
-          fill="${liked ? 'currentColor' : 'none'}"
-          stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-        </svg>
-        ${likeCount > 0 ? `<span class="tile-like-count">${likeCount}</span>` : ''}
-      </button>
-    </div>
-    <img class="post-drawing tile-img" src="${data.message || ''}" alt="desenho" loading="lazy" />
-  `;
-  el.querySelector('.tile-like-btn').addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleLike(id, postsMap.get(id) || data);
-  });
+  el.innerHTML = `<img class="post-drawing tile-img" src="${data.message || ''}" alt="desenho" loading="lazy" />`;
   seenObserver.observe(el);
   visibilityObserver.observe(el);
   return el;
-}
-
-function updateDrawingTile(el, data) {
-  const liked = (data.likedBy || []).includes(me?.id);
-  const likeCount = (data.likedBy || []).length;
-  const btn = el.querySelector('.tile-like-btn');
-  if (!btn) return;
-  btn.classList.toggle('liked', liked);
-  btn.querySelector('svg').setAttribute('fill', liked ? 'currentColor' : 'none');
-  let countEl = btn.querySelector('.tile-like-count');
-  if (likeCount > 0) {
-    if (!countEl) {
-      countEl = document.createElement('span');
-      countEl.className = 'tile-like-count';
-      btn.appendChild(countEl);
-    }
-    countEl.textContent = likeCount;
-  } else {
-    countEl?.remove();
-  }
 }
 
 async function selfDeletePost(id, el) {
@@ -1401,13 +1360,6 @@ async function reportReply(postId, replyId, replyData) {
   }
 }
 
-function updateReplyCcomposersGradient() {
-  if (!me) return;
-  document.querySelectorAll('.reply-avatar').forEach(el => {
-    setGradientBg(el, me.gradient);
-  });
-}
-
 // ═══════════════════════════════════════════
 // MAIN POSTS LISTENER (with pending buffer)
 // ═══════════════════════════════════════════
@@ -1666,8 +1618,6 @@ function renderGallery(container, list) {
     if (!existing) {
       existing = buildDrawingTile(id, data);
       cardElements.set(id, existing);
-    } else {
-      updateDrawingTile(existing, data);
     }
     const postsInContainer = Array.from(container.querySelectorAll('[data-id]'));
     const current = postsInContainer[idx];
@@ -1933,10 +1883,7 @@ function renderNotifList() {
     });
   });
 
-  items.sort((a, b) => {
-    if (a.hasNew !== b.hasNew) return a.hasNew ? -1 : 1;
-    return b.postDate - a.postDate;
-  });
+  items.sort((a, b) => b.postDate - a.postDate);
 
   if (items.length === 0) {
     notifList.innerHTML = '<div class="notif-empty">meio vazio aqui...<br></div>';
@@ -2074,6 +2021,7 @@ document.addEventListener('click', e => {
     caption: postData?.caption || null,
     author: postData?.author || null,
     gradient: postData?.gradient || null,
+    avatarPhoto: postData?.avatarPhoto || null,
     onOpen: (threadEl, composerEl, actionsEl) => {
       if (postId && actionsEl) renderLightboxActions(actionsEl, postId, postsMap.get(postId) || postData);
       if (!postId) return;

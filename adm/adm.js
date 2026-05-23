@@ -4,17 +4,18 @@ import {
 } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js';
 import {
   getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, setDoc,
-  serverTimestamp, query, orderBy, onSnapshot, limit, increment, getDocs, where,
-  arrayUnion, arrayRemove,
+  serverTimestamp, Timestamp, query, orderBy, onSnapshot, limit, increment,
+  getDocs, where, arrayUnion, arrayRemove,
 } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js';
 import { getMessaging, getToken } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-messaging.js';
 import {
   gradientCSS, escapeHTML, formatTimeAbs,
-  buildPostCard, updatePostCard, openLightbox,
+  buildPostCard, openLightbox,
 } from '../src/shared.js';
 
 const firebaseConfig = await fetch('/api/config').then(r => r.json());
 const MOD_NAMES = new Set((firebaseConfig.moderatorProfiles || []).map(p => p.name));
+const MOD_IDS   = new Set((firebaseConfig.moderatorProfiles || []).map(p => p.id));
 
 const POSTS = 'hangul_messages';
 const BANS  = 'hangul_bans';
@@ -28,19 +29,18 @@ const loginScreen        = document.getElementById('loginScreen');
 const adminShell         = document.getElementById('adminShell');
 const loadingScreen      = document.getElementById('loadingScreen');
 const loginBtn           = document.getElementById('loginBtn');
-const reportsBtn         = document.getElementById('reportsBtn');
-const reportsOverlay     = document.getElementById('reportsOverlay');
-const reportsClose       = document.getElementById('reportsClose');
-const reportsOverlayCount= document.getElementById('reportsOverlayCount');
-const reportsOverlayList = document.getElementById('reportsOverlayList');
-const reportsBadge       = document.getElementById('reportsBadge');
 const enablePushBtn      = document.getElementById('enablePushBtn');
 const searchToggleBtn    = document.getElementById('searchToggleBtn');
 const searchBar          = document.getElementById('searchBar');
 const searchInput        = document.getElementById('searchInput');
-const postList           = document.getElementById('postList');
+const reportsList        = document.getElementById('reportsList');
+const reportsSectionLabel = document.getElementById('reportsSectionLabel');
 const postsCountTools    = document.getElementById('postsCountTools');
+const composeAvatarInput = document.getElementById('composeAvatarInput');
+const composeAvatarBtn   = document.getElementById('composeAvatarBtn');
 const composeAvatar      = document.getElementById('composeAvatar');
+const composeCustomName  = document.getElementById('composeCustomName');
+const composeCustomTime  = document.getElementById('composeCustomTime');
 const composeText        = document.getElementById('composeText');
 const composeCount       = document.getElementById('composeCount');
 const composeBtn         = document.getElementById('composeBtn');
@@ -63,6 +63,7 @@ let pendingConfirm    = null;
 let pendingMaintain   = null;
 let toastTimer        = null;
 let unsubscribePosts  = null;
+let composeAvatarPhotoData = null;
 
 // ── Toast ──
 function showToast(text, type = '') {
@@ -151,7 +152,6 @@ onAuthStateChanged(auth, async (user) => {
       body: JSON.stringify({ idToken }),
     });
   } catch {
-    // Network failure — keep session alive, let user retry
     loadingScreen.classList.add('hidden');
     loginScreen.classList.remove('hidden');
     showToast('sem conexão. tente novamente', 'error');
@@ -165,7 +165,6 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
   if (!res.ok) {
-    // Server error — don't sign out, let user retry
     loadingScreen.classList.add('hidden');
     loginScreen.classList.remove('hidden');
     showToast('erro no servidor. tente novamente', 'error');
@@ -176,10 +175,15 @@ onAuthStateChanged(auth, async (user) => {
   loadingScreen.classList.add('hidden');
   adminShell.classList.remove('hidden');
   adminShell.classList.add('tools-active');
+
+  // Init compose avatar with mod gradient
   composeAvatar.style.backgroundImage = gradientCSS(modProfile.gradient);
+  composeAvatar.style.backgroundSize = '130% 130%';
+  composeAvatar.style.backgroundPosition = 'center center';
+
+  setDefaultComposeTime();
   loadPosts();
-  
-  // Initialize Web Push for Moderators
+
   if ('serviceWorker' in navigator && 'Notification' in window) {
     if (Notification.permission === 'default') {
       enablePushBtn.style.display = 'flex';
@@ -193,7 +197,7 @@ async function setupFCM() {
   try {
     const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
     const messaging = getMessaging(app);
-    const currentToken = await getToken(messaging, { 
+    const currentToken = await getToken(messaging, {
       vapidKey: 'BDWpogUdy0kNGEdHXCBE1Qvi_w49ABjRT20UT0CeZelZaeiqAwoSGi_ck1un1esau9jzy86mF_1Ver-L8rTpmQM',
       serviceWorkerRegistration: registration
     });
@@ -219,11 +223,68 @@ enablePushBtn.addEventListener('click', async () => {
   }
 });
 
-// ── Reports overlay ──
-reportsBtn.addEventListener('click', () => reportsOverlay.classList.add('open'));
-reportsClose.addEventListener('click', () => reportsOverlay.classList.remove('open'));
-
 // ── Admin Composer ──
+
+function setDefaultComposeTime() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  composeCustomTime.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+
+function resetCompose() {
+  composeText.value = '';
+  composeText.style.height = 'auto';
+  composeCount.textContent = '0/300';
+  composeBtn.disabled = true;
+  composeCustomName.value = '';
+  composeAvatarPhotoData = null;
+  composeAvatarInput.value = '';
+  composeAvatarBtn.classList.remove('has-photo');
+  if (modProfile) {
+    composeAvatar.style.backgroundImage = gradientCSS(modProfile.gradient);
+    composeAvatar.style.backgroundSize = '130% 130%';
+    composeAvatar.style.backgroundPosition = 'center center';
+  }
+  setDefaultComposeTime();
+}
+
+// Resize photo to at most 200×200 before storing
+function resizePhoto(file) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX = 200;
+      const scale = Math.min(MAX / img.width, MAX / img.height, 1);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+
+composeAvatarBtn.addEventListener('click', () => composeAvatarInput.click());
+
+composeAvatarInput.addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { showToast('arquivo não é uma imagem', 'error'); return; }
+  const data = await resizePhoto(file);
+  if (!data) { showToast('erro ao processar imagem', 'error'); return; }
+  composeAvatarPhotoData = data;
+  composeAvatar.style.backgroundImage = `url(${data})`;
+  composeAvatar.style.backgroundSize = 'cover';
+  composeAvatar.style.backgroundPosition = 'center center';
+  composeAvatarBtn.classList.add('has-photo');
+});
+
 composeText.addEventListener('input', () => {
   const len = composeText.value.length;
   composeCount.textContent = `${len}/300`;
@@ -239,21 +300,34 @@ composeBtn.addEventListener('click', async () => {
   composeBtn.disabled = true;
   composeBtn.textContent = '…';
   try {
-    await addDoc(collection(db, POSTS), {
+    const customName = composeCustomName.value.trim();
+    const author = customName || modProfile.name;
+
+    let createdAt;
+    const timeVal = composeCustomTime.value;
+    if (timeVal) {
+      createdAt = Timestamp.fromDate(new Date(timeVal));
+    } else {
+      createdAt = serverTimestamp();
+    }
+
+    const postData = {
       type: 'text', message: text,
-      author: modProfile.name, authorId: modProfile.id,
+      author, authorId: modProfile.id,
       gradient: modProfile.gradient,
       likedBy: [], replyCount: 0,
-      createdAt: serverTimestamp(),
-    });
-    composeText.value = '';
-    composeText.style.height = 'auto';
-    composeCount.textContent = '0/300';
+      createdAt,
+      ...(composeAvatarPhotoData ? { avatarPhoto: composeAvatarPhotoData } : {}),
+      ...(customName ? { isIdolPost: true } : {}),
+    };
+
+    await addDoc(collection(db, POSTS), postData);
+    resetCompose();
     showToast('postado!', 'success');
   } catch (e) {
     showToast('erro ao postar: ' + e.message, 'error');
   } finally {
-    composeBtn.disabled = false;
+    composeBtn.disabled = composeText.value.trim().length === 0;
     composeBtn.textContent = 'postar';
   }
 });
@@ -266,7 +340,7 @@ searchToggleBtn.addEventListener('click', () => {
   } else {
     searchBar.style.display = 'none';
     searchInput.value = '';
-    renderPosts();
+    renderReports();
   }
 });
 
@@ -274,7 +348,7 @@ searchToggleBtn.addEventListener('click', () => {
 function loadPosts() {
   if (unsubscribePosts) unsubscribePosts();
 
-  postList.innerHTML = `<div class="state-loading">
+  reportsList.innerHTML = `<div class="state-loading">
     <svg class="spinner" width="26" height="26" viewBox="0 0 24 24">
       <circle cx="12" cy="12" r="10" stroke="rgba(255,45,120,0.3)" stroke-width="3" fill="none"/>
       <path d="M12 2a10 10 0 0 1 10 10" stroke="#ff2d78" stroke-width="3" fill="none" stroke-linecap="round"/>
@@ -284,53 +358,53 @@ function loadPosts() {
   unsubscribePosts = onSnapshot(q,
     (snap) => {
       allPosts = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
-      updateReports();
-      renderPosts();
+      renderReports();
     },
     (e) => {
-      postList.innerHTML = `<div class="state-empty"><p>erro: ${escapeHTML(String(e.message || e))}</p></div>`;
+      reportsList.innerHTML = `<div class="state-empty"><p>erro: ${escapeHTML(String(e.message || e))}</p></div>`;
       showToast('erro ao carregar', 'error');
     }
   );
 }
 
-// ── Reports ──
-function updateReports() {
-  // A post needs review when it has more reports than the last maintained count
+// ── Render reports (inline, replaces postList) ──
+function renderReports() {
+  const search = searchInput.value.toLowerCase().trim();
+
   const pending = allPosts
     .filter(p => (p.reportedBy?.length || 0) > (p.maintainedCount || 0))
+    .filter(p => {
+      if (!search) return true;
+      return (p.author || '').toLowerCase().includes(search)
+          || (p.message || '').toLowerCase().includes(search);
+    })
     .sort((a, b) => {
       const da = (a.reportedBy?.length || 0) - (a.maintainedCount || 0);
-      const db2= (b.reportedBy?.length || 0) - (b.maintainedCount || 0);
+      const db2 = (b.reportedBy?.length || 0) - (b.maintainedCount || 0);
       return db2 - da;
     });
 
   if (pending.length > 0) {
-    reportsBadge.textContent = pending.length;
-    reportsBadge.classList.remove('hidden');
-    reportsBtn.classList.add('has-reports');
+    reportsSectionLabel.style.display = 'flex';
+    postsCountTools.textContent = String(pending.length);
   } else {
-    reportsBadge.classList.add('hidden');
-    reportsBtn.classList.remove('has-reports');
+    reportsSectionLabel.style.display = 'none';
+    postsCountTools.textContent = '';
   }
 
-  reportsOverlayCount.textContent = `${pending.length} post${pending.length !== 1 ? 's' : ''}`;
-  reportsOverlayCount.classList.toggle('hidden', pending.length === 0);
-
-  reportsOverlayList.innerHTML = '';
+  reportsList.innerHTML = '';
   if (pending.length === 0) {
-    reportsOverlayList.innerHTML = `<div class="reports-empty">sem denúncias pendentes ✓</div>`;
+    reportsList.innerHTML = `<div class="state-empty"><p>sem denúncias pendentes ✓</p></div>`;
     return;
   }
 
-  pending.forEach(post => reportsOverlayList.appendChild(buildReportItem(post)));
+  pending.forEach(post => reportsList.appendChild(buildReportItem(post)));
 }
 
 function buildReportItem(post) {
   const wrap = document.createElement('div');
   wrap.className = 'report-post-wrap';
 
-  // Post card (read-only — no like/reply/delete handlers)
   const card = buildPostCard(post.docId, post, {
     me: modProfile,
     modNames: MOD_NAMES,
@@ -339,7 +413,6 @@ function buildReportItem(post) {
   addBanHandlers(card, post);
   wrap.appendChild(card);
 
-  // Action bar
   const actionBar = document.createElement('div');
   actionBar.className = 'report-action-bar';
 
@@ -356,8 +429,7 @@ function buildReportItem(post) {
         try {
           await deleteDoc(doc(db, POSTS, post.docId));
           allPosts = allPosts.filter(p => p.docId !== post.docId);
-          updateReports();
-          renderPosts();
+          renderReports();
           showToast('post deletado', 'success');
         } catch (e) {
           showToast('erro: ' + e.message, 'error');
@@ -391,205 +463,11 @@ async function doMaintainPost(post, note) {
         ? { ...p, maintainedCount: updateData.maintainedCount, ...(note ? { maintainNote: note } : {}) }
         : p
     );
-    updateReports();
-    renderPosts();
+    renderReports();
     showToast('post mantido', 'success');
   } catch (e) {
     showToast('erro: ' + e.message, 'error');
   }
-}
-
-// ── Render feed ──
-function renderPosts() {
-  const search = searchInput.value.toLowerCase().trim();
-  const filtered = allPosts.filter(p => {
-    if (search) {
-      const ok = (p.author || '').toLowerCase().includes(search)
-              || (p.message || '').toLowerCase().includes(search);
-      if (!ok) return false;
-    }
-    return true;
-  });
-  if (postsCountTools) postsCountTools.textContent = `${filtered.length} post${filtered.length !== 1 ? 's' : ''}`;
-  if (!filtered.length) {
-    postList.innerHTML = `<div class="state-empty"><p>nenhum post encontrado</p></div>`;
-    return;
-  }
-  postList.innerHTML = '';
-  filtered.forEach(p => postList.appendChild(buildAdminPostCard(p)));
-}
-
-function buildAdminPostCard(post) {
-  const card = buildPostCard(post.docId, post, {
-    me: modProfile,
-    modNames: MOD_NAMES,
-    formatTimeFn: formatTimeAbs,
-    onDelete: (id, el) => confirmDelete(post, el),
-    onReplyClick: (el) => toggleRepliesSection(post, el),
-    onLike: (id, data) => adminToggleLike(id, data),
-  });
-  addBanHandlers(card, post);
-  return card;
-}
-
-async function adminToggleLike(id, data) {
-  if (!modProfile) return;
-  const liked = (data.likedBy || []).includes(modProfile.id);
-  try {
-    await updateDoc(doc(db, POSTS, id), {
-      likedBy: liked ? arrayRemove(modProfile.id) : arrayUnion(modProfile.id),
-    });
-    const post = allPosts.find(p => p.docId === id);
-    if (post) {
-      post.likedBy = liked
-        ? (post.likedBy || []).filter(u => u !== modProfile.id)
-        : [...(post.likedBy || []), modProfile.id];
-      const card = postList.querySelector(`[data-id="${id}"]`);
-      if (card) updatePostCard(card, post, modProfile, formatTimeAbs);
-    }
-  } catch (e) {
-    showToast('erro ao curtir: ' + e.message, 'error');
-  }
-}
-
-// ── Replies section (on-demand toggle) ──
-async function toggleRepliesSection(post, articleEl) {
-  const section  = articleEl.querySelector('.replies-section');
-  const replyBtn = articleEl.querySelector('.reply-btn');
-
-  if (section.children.length > 0) {
-    section.innerHTML = '';
-    replyBtn.classList.remove('open');
-    return;
-  }
-
-  replyBtn.classList.add('open');
-  const thread = document.createElement('div');
-  thread.className = 'reply-thread';
-
-  try {
-    const q    = query(collection(db, POSTS, post.docId, 'replies'), orderBy('createdAt', 'asc'));
-    const snap = await getDocs(q);
-    if (snap.empty) {
-      const empty = document.createElement('p');
-      empty.className = 'replies-empty';
-      empty.textContent = 'ainda sem respostas';
-      thread.appendChild(empty);
-    } else {
-      snap.forEach(d => thread.appendChild(buildReplyItem(d.id, d.data(), post.docId)));
-    }
-  } catch (e) {
-    showToast('erro ao carregar respostas', 'error');
-  }
-
-  section.appendChild(thread);
-  section.appendChild(buildReplyComposer(post.docId, thread, post));
-}
-
-function buildReplyItem(replyId, r, postId) {
-  const item = document.createElement('div');
-  item.className = 'thread-item';
-
-  const av = document.createElement('div');
-  av.className = 'avatar avatar-sm';
-  av.style.backgroundImage = gradientCSS(r.gradient);
-  item.appendChild(av);
-
-  const body = document.createElement('div');
-  body.className = 'reply-body';
-  body.innerHTML = `
-    <div class="reply-header">
-      <span class="reply-author">${escapeHTML(r.author || 'anônimo')}</span>
-      <span class="reply-time">${formatTimeAbs(r.createdAt)}</span>
-    </div>
-    <div class="reply-content">
-      ${r.type === 'drawing' && typeof r.message === 'string' && /^data:image\/(png|jpeg|gif|webp);base64,/.test(r.message)
-        ? `<img class="post-drawing" src="${r.message}" alt="desenho" loading="lazy" />`
-        : escapeHTML(r.message || '')
-      }
-    </div>
-  `;
-  item.appendChild(body);
-
-  const delBtn = document.createElement('button');
-  delBtn.className = 'reply-delete';
-  delBtn.textContent = '✕';
-  delBtn.title = `deletar resposta de @${r.author || 'anônimo'}`;
-  delBtn.addEventListener('click', async () => {
-    if (!confirm(`Deletar resposta de @${r.author || 'anônimo'}?`)) return;
-    try {
-      await deleteDoc(doc(db, POSTS, postId, 'replies', replyId));
-      item.remove();
-      showToast('resposta deletada', 'success');
-    } catch (e) {
-      showToast('erro: ' + e.message, 'error');
-    }
-  });
-  item.appendChild(delBtn);
-
-  return item;
-}
-
-function buildReplyComposer(postId, threadEl, post) {
-  const wrap = document.createElement('div');
-  wrap.className = 'reply-composer';
-
-  const av = document.createElement('div');
-  av.className = 'avatar avatar-sm';
-  av.style.backgroundImage = modProfile ? gradientCSS(modProfile.gradient) : '';
-  wrap.appendChild(av);
-
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.className = 'reply-input';
-  input.placeholder = 'escrever resposta…';
-  input.maxLength = 200;
-  wrap.appendChild(input);
-
-  const send = document.createElement('button');
-  send.className = 'reply-send';
-  send.disabled = true;
-  send.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-  </svg>`;
-  wrap.appendChild(send);
-
-  input.addEventListener('input', () => { send.disabled = input.value.trim().length === 0; });
-
-  const submit = async () => {
-    const txt = input.value.trim();
-    if (!txt || !modProfile) return;
-    send.disabled = true;
-    try {
-      await addDoc(collection(db, POSTS, postId, 'replies'), {
-        type: 'text', message: txt,
-        author: modProfile.name, authorId: modProfile.id,
-        gradient: modProfile.gradient, createdAt: serverTimestamp(),
-      });
-      await updateDoc(doc(db, POSTS, postId), { replyCount: increment(1) });
-      threadEl.querySelector('.replies-empty')?.remove();
-      const fakeTs = { toDate: () => new Date() };
-      threadEl.appendChild(buildReplyItem('_local_' + Date.now(), {
-        type: 'text', message: txt,
-        author: modProfile.name, gradient: modProfile.gradient,
-        createdAt: fakeTs,
-      }, postId));
-      const localPost = allPosts.find(p => p.docId === postId);
-      if (localPost) localPost.replyCount = (localPost.replyCount || 0) + 1;
-      post.replyCount = (post.replyCount || 0) + 1;
-      input.value = '';
-      showToast('resposta enviada!', 'success');
-    } catch (e) {
-      showToast('erro: ' + e.message, 'error');
-    } finally {
-      send.disabled = input.value.trim().length === 0;
-    }
-  };
-
-  send.addEventListener('click', submit);
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
-
-  return wrap;
 }
 
 // ── Ban user ──
@@ -609,7 +487,8 @@ async function banUser(authorId, authorName) {
 }
 
 function addBanHandlers(card, post) {
-  if (MOD_NAMES.has(post.author) || !post.authorId) return;
+  // Never ban mod accounts or idol posts created by mods
+  if (MOD_NAMES.has(post.author) || MOD_IDS.has(post.authorId) || !post.authorId) return;
   card.querySelectorAll('.avatar-md, .post-author').forEach(el => {
     el.style.cursor = 'pointer';
     el.addEventListener('click', (e) => {
@@ -623,35 +502,10 @@ function addBanHandlers(card, post) {
   });
 }
 
-// ── Delete post ──
-function confirmDelete(post, el) {
-  const preview = post.type === 'drawing' ? '[desenho]' : `"${(post.message || '').slice(0, 60)}…"`;
-  openConfirm(
-    'Deletar post?',
-    `De @${post.author || 'anônimo'}: ${preview}\n\nEsta ação é permanente.`,
-    () => doDeletePost(post, el)
-  );
-}
-
-async function doDeletePost(post, el) {
-  el.classList.add('deleting');
-  try {
-    await deleteDoc(doc(db, POSTS, post.docId));
-    allPosts = allPosts.filter(p => p.docId !== post.docId);
-    el.remove();
-    showToast('post deletado', 'success');
-  } catch (e) {
-    el.classList.remove('deleting');
-    showToast('erro: ' + e.message, 'error');
-  }
-}
-
 // ── Events ──
-searchInput.addEventListener('input', renderPosts);
+searchInput.addEventListener('input', renderReports);
 
 // ── Drawing lightbox ──
-const _SEND_SVG_ADM = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`;
-
 document.addEventListener('click', e => {
   const img = e.target.closest('.post-drawing');
   if (!img || !img.src) return;
@@ -701,6 +555,24 @@ function renderAdminLightboxActions(actionsEl, postId, post) {
     const updatedPost = allPosts.find(p => p.docId === postId);
     if (updatedPost) renderAdminLightboxActions(actionsEl, postId, updatedPost);
   });
+}
+
+async function adminToggleLike(id, data) {
+  if (!modProfile) return;
+  const liked = (data.likedBy || []).includes(modProfile.id);
+  try {
+    await updateDoc(doc(db, POSTS, id), {
+      likedBy: liked ? arrayRemove(modProfile.id) : arrayUnion(modProfile.id),
+    });
+    const post = allPosts.find(p => p.docId === id);
+    if (post) {
+      post.likedBy = liked
+        ? (post.likedBy || []).filter(u => u !== modProfile.id)
+        : [...(post.likedBy || []), modProfile.id];
+    }
+  } catch (e) {
+    showToast('erro ao curtir: ' + e.message, 'error');
+  }
 }
 
 function renderAdminLightboxThread(threadEl, snap, postId) {
