@@ -315,7 +315,7 @@ composeBtn.addEventListener('click', async () => {
       type: 'text', message: text,
       author, authorId: modProfile.id,
       gradient: modProfile.gradient,
-      likedBy: [], replyCount: 0,
+      likedBy: [], likeCount: 0, replyCount: 0,
       createdAt,
       ...(composeAvatarPhotoData ? { avatarPhoto: composeAvatarPhotoData } : {}),
       ...(customName ? { isIdolPost: true } : {}),
@@ -577,6 +577,7 @@ async function adminToggleLike(id, data) {
   try {
     await updateDoc(doc(db, POSTS, id), {
       likedBy: liked ? arrayRemove(modProfile.id) : arrayUnion(modProfile.id),
+      likeCount: increment(liked ? -1 : 1)
     });
     const post = allPosts.find(p => p.docId === id);
     if (post) {
@@ -658,4 +659,31 @@ function wireAdminLightboxComposer(composerEl, postId) {
   };
   sendBtn.addEventListener('click', submit);
   input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } });
+}
+
+// ── Offline Site Control ──
+const toggleOfflineBtn = document.getElementById('toggleOfflineBtn');
+let isSystemOffline = false;
+
+if (toggleOfflineBtn) {
+  onSnapshot(doc(db, 'hangul_config', 'system'), (snap) => {
+    if (snap.exists()) {
+      isSystemOffline = snap.data().isOffline || false;
+      toggleOfflineBtn.textContent = isSystemOffline ? 'Colocar no ar' : 'Retirar do ar';
+      toggleOfflineBtn.className = isSystemOffline ? 'btn-report-maintain' : 'btn-report-del';
+    }
+  });
+
+  toggleOfflineBtn.addEventListener('click', async () => {
+    try {
+      const newStatus = !isSystemOffline;
+      if (newStatus) {
+        if (!confirm('Tem certeza que deseja retirar o site do ar para os usuários comuns?')) return;
+      }
+      await setDoc(doc(db, 'hangul_config', 'system'), { isOffline: newStatus }, { merge: true });
+      showToast(newStatus ? 'Site offline' : 'Site online', 'success');
+    } catch (err) {
+      showToast('erro ao alterar status: ' + err.message, 'error');
+    }
+  });
 }

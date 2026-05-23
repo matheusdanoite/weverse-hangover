@@ -25,3 +25,11 @@ npm-debug.log*
 claude design feed/
 claude design mural/
 
+# AI configs & logs
+CLAUDE.md
+GEMINI.md
+.claude/
+.gemini/
+
+# Deployment & Firebase
+.firebaserc

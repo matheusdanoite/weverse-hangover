@@ -110,18 +110,10 @@ function buildCard(id, data, isNew = false) {
   el.className = `board-card`;
   el.dataset.id = id;
 
-  const authorName = data.author || 'anônimo';
-  const nameLen = authorName.length;
-  let nameStyle = '';
-  if (nameLen > 14) {
-    const scale = Math.max(0.65, 0.95 - (nameLen - 14) * 0.025);
-    nameStyle = `style="font-size: ${scale}rem;"`;
-  }
-
   el.innerHTML = `
     <div class="card-header">
       <div class="card-avatar" style="background-image:${grad};${avatarBgExtra}"></div>
-      <span class="card-author" ${nameStyle}>${escapeHTML(authorName)}</span>
+      <span class="card-author">${escapeHTML(data.author || 'anônimo')}</span>
       ${isMod ? '<span class="card-mod-star">★</span>' : ''}
     </div>
     ${contentHTML}
@@ -371,49 +363,92 @@ const q = query(
   limit(200)
 );
 
+const scheduledPosts = new Map();
+
+setInterval(() => {
+  const now = Date.now();
+  let hasNew = false;
+  scheduledPosts.forEach((data, id) => {
+    if (data.createdAt && data.createdAt.toMillis() <= now) {
+      scheduledPosts.delete(id);
+      postsMap.set(id, data);
+      const _rc = data.reportedBy?.length || 0;
+      const _mc = data.maintainedCount || 0;
+      if (!(_rc >= 7 && _rc > _mc)) {
+        newPostsQueue.push({ id, data });
+        hasNew = true;
+      }
+    }
+  });
+  if (hasNew && !isOverlayActive) {
+    processNewPostQueue();
+  }
+}, 10000);
+
 onSnapshot(q, (snap) => {
   const newPostIds = [];
+  const now = Date.now();
 
   snap.docChanges().forEach((change) => {
     const id = change.doc.id;
     const data = change.doc.data();
+    const isFuture = data.createdAt && data.createdAt.toMillis() > Date.now();
 
     if (change.type === 'added') {
-      postsMap.set(id, data);
-      if (!firstLoad) {
-        newPostIds.push(id);
+      if (isFuture) {
+        scheduledPosts.set(id, data);
+      } else {
+        postsMap.set(id, data);
+        if (!firstLoad) {
+          newPostIds.push(id);
+        }
       }
     } else if (change.type === 'modified') {
-      postsMap.set(id, data);
-      const existingCards = gridInner.querySelectorAll(`.board-card[data-id="${id}"]`);
-      existingCards.forEach(card => {
-        const likeCount = (data.likedBy || []).length;
-        const replyCount = data.replyCount || 0;
-        const likeStat = card.querySelector('.card-stat');
-        if (likeStat) {
-          likeStat.classList.toggle('has-likes', likeCount > 0);
-          likeStat.querySelector('svg').setAttribute('fill', likeCount > 0 ? 'currentColor' : 'none');
-          const statNumEl = likeStat.querySelector('.stat-num');
-          const newText = likeCount.toString();
-          if (statNumEl && statNumEl.textContent !== newText) {
-            statNumEl.textContent = newText;
-            likeStat.classList.add('pop');
-            setTimeout(() => likeStat.classList.remove('pop'), 300);
-          }
+      if (isFuture) {
+        scheduledPosts.set(id, data);
+        if (postsMap.has(id)) {
+          postsMap.delete(id);
+          removeCardSmoothly(id);
         }
-        const replyStat = card.querySelectorAll('.card-stat')[1];
-        if (replyStat) {
-          const statNumEl = replyStat.querySelector('.stat-num');
-          const newText = replyCount.toString();
-          if (statNumEl && statNumEl.textContent !== newText) {
-            statNumEl.textContent = newText;
-            replyStat.classList.add('pop');
-            setTimeout(() => replyStat.classList.remove('pop'), 300);
-          }
+      } else {
+        if (scheduledPosts.has(id)) {
+          scheduledPosts.delete(id);
+          postsMap.set(id, data);
+          newPostIds.push(id);
+        } else if (postsMap.has(id)) {
+          postsMap.set(id, data);
+          const existingCards = gridInner.querySelectorAll(`.board-card[data-id="${id}"]`);
+          existingCards.forEach(card => {
+            const likeCount = (data.likedBy || []).length;
+            const replyCount = data.replyCount || 0;
+            const likeStat = card.querySelector('.card-stat');
+            if (likeStat) {
+              likeStat.classList.toggle('has-likes', likeCount > 0);
+              likeStat.querySelector('svg').setAttribute('fill', likeCount > 0 ? 'currentColor' : 'none');
+              const statNumEl = likeStat.querySelector('.stat-num');
+              const newText = likeCount.toString();
+              if (statNumEl && statNumEl.textContent !== newText) {
+                statNumEl.textContent = newText;
+                likeStat.classList.add('pop');
+                setTimeout(() => likeStat.classList.remove('pop'), 300);
+              }
+            }
+            const replyStat = card.querySelectorAll('.card-stat')[1];
+            if (replyStat) {
+              const statNumEl = replyStat.querySelector('.stat-num');
+              const newText = replyCount.toString();
+              if (statNumEl && statNumEl.textContent !== newText) {
+                statNumEl.textContent = newText;
+                replyStat.classList.add('pop');
+                setTimeout(() => replyStat.classList.remove('pop'), 300);
+              }
+            }
+          });
         }
-      });
+      }
     } else if (change.type === 'removed') {
       postsMap.delete(id);
+      scheduledPosts.delete(id);
       removeCardSmoothly(id);
     }
   });

@@ -801,6 +801,7 @@ async function handleSubmit() {
       authorId: me.id,
       gradient: me.gradient,
       likedBy: [],
+      likeCount: 0,
       replyCount: 0,
       createdAt: serverTimestamp(),
     };
@@ -852,21 +853,9 @@ function getPostsForTab(tab) {
   switch (tab) {
     case 'texts':    return all.filter(([, d]) => d.type !== 'drawing').sort(cmp);
     case 'drawings': return all.filter(([, d]) => d.type === 'drawing').sort(cmp);
-    case 'top':      return all.filter(([, d]) => (d.likedBy?.length || 0) > 0).sort((a, b) => (b[1].likedBy?.length || 0) - (a[1].likedBy?.length || 0)).slice(0, 10);
     case 'mods':     return all.filter(([, d]) => MOD_NAMES.has(d.author)).sort(cmp);
     default:         return all.sort(cmp);
   }
-}
-
-function getTopCommented() {
-  const result = [];
-  for (const [id, data] of postsMap.entries()) {
-    const _rc = data.reportedBy?.length || 0;
-    const _mc = data.maintainedCount || 0;
-    if (_rc >= 7 && _rc > _mc) continue;
-    if ((data.replyCount || 0) > 0) result.push([id, data]);
-  }
-  return result.sort((a, b) => (b[1].replyCount || 0) - (a[1].replyCount || 0)).slice(0, 10);
 }
 
 let _tabCountsCache = '';
@@ -1060,7 +1049,10 @@ async function toggleLike(id, data) {
 async function _doLike(id, data, liked) {
   const ref = doc(db, POSTS, id);
   try {
-    const updates = { likedBy: liked ? arrayRemove(me.id) : arrayUnion(me.id) };
+    const updates = { 
+      likedBy: liked ? arrayRemove(me.id) : arrayUnion(me.id),
+      likeCount: increment(liked ? -1 : 1)
+    };
     if (!liked && data.authorId !== me.id) {
       updates.lastLikerName = me.name;
       updates.lastLikerGradient = me.gradient;
@@ -1370,8 +1362,32 @@ let isFetchingMore = false;
 
 const postsMap = new Map();
 const pendingNewPosts = new Map();
+const scheduledPosts = new Map();
 let initialLoadDone = false;
 let _lightboxPostId = null;
+
+setInterval(() => {
+  const now = Date.now();
+  let changed = false;
+  let hasNewFromOthers = false;
+  scheduledPosts.forEach((data, id) => {
+    if (data.createdAt && data.createdAt.toMillis() <= now) {
+      scheduledPosts.delete(id);
+      if (data.authorId === me?.id) {
+        postsMap.set(id, data);
+        changed = true;
+      } else {
+        pendingNewPosts.set(id, data);
+        hasNewFromOthers = true;
+      }
+    }
+  });
+  if (hasNewFromOthers) showUpdateButton();
+  if (changed) {
+    renderFeed();
+    updateNotifications();
+  }
+}, 10000);
 
 const postsQ = query(collection(db, POSTS), orderBy('createdAt', 'desc'), limit(50));
 
@@ -1385,8 +1401,17 @@ onSnapshot(postsQ, (snapshot) => {
   }
   emptyFeed.classList.add('hidden');
 
+  const now = Date.now();
+
   if (!initialLoadDone) {
-    snapshot.forEach(d => postsMap.set(d.id, d.data()));
+    snapshot.forEach(d => {
+      const data = d.data();
+      if (data.createdAt && data.createdAt.toMillis() > now) {
+        scheduledPosts.set(d.id, data);
+      } else {
+        postsMap.set(d.id, data);
+      }
+    });
     lastVisible = snapshot.docs[snapshot.docs.length - 1] ?? null;
     initialLoadDone = true;
     feedLoading.classList.add('hidden');
@@ -1401,19 +1426,40 @@ onSnapshot(postsQ, (snapshot) => {
   snapshot.docChanges().forEach(change => {
     const id = change.doc.id;
     const data = change.doc.data();
+    const isFuture = data.createdAt && data.createdAt.toMillis() > Date.now();
 
     if (change.type === 'added') {
-      if (data.authorId === me?.id) {
-        // Own post: show immediately
-        postsMap.set(id, data);
+      if (isFuture) {
+        scheduledPosts.set(id, data);
       } else {
-        // Other user's post: buffer
-        pendingNewPosts.set(id, data);
-        hasNewFromOthers = true;
+        if (data.authorId === me?.id) {
+          // Own post: show immediately
+          postsMap.set(id, data);
+        } else {
+          // Other user's post: buffer
+          pendingNewPosts.set(id, data);
+          hasNewFromOthers = true;
+        }
       }
     } else if (change.type === 'modified') {
-      if (postsMap.has(id)) postsMap.set(id, data);
-      if (pendingNewPosts.has(id)) pendingNewPosts.set(id, data);
+      if (isFuture) {
+        scheduledPosts.set(id, data);
+        if (postsMap.has(id)) postsMap.delete(id);
+        if (pendingNewPosts.has(id)) pendingNewPosts.delete(id);
+      } else {
+        if (scheduledPosts.has(id)) {
+          scheduledPosts.delete(id);
+          if (data.authorId === me?.id) {
+            postsMap.set(id, data);
+          } else {
+            pendingNewPosts.set(id, data);
+            hasNewFromOthers = true;
+          }
+        } else {
+          if (postsMap.has(id)) postsMap.set(id, data);
+          if (pendingNewPosts.has(id)) pendingNewPosts.set(id, data);
+        }
+      }
       if (id === _lightboxPostId) {
         const actionsEl = document.querySelector('.lightbox-actions');
         if (actionsEl) renderLightboxActions(actionsEl, id, data);
@@ -1421,6 +1467,7 @@ onSnapshot(postsQ, (snapshot) => {
     } else if (change.type === 'removed') {
       postsMap.delete(id);
       pendingNewPosts.delete(id);
+      scheduledPosts.delete(id);
     }
   });
 
@@ -1465,6 +1512,40 @@ function cleanupTrendingSections() {
   feed.querySelectorAll('.rank-strip, .trending-section').forEach(el => el.remove());
 }
 
+const topLikedQ = query(collection(db, POSTS), orderBy('likeCount', 'desc'), limit(15));
+const topCommentedQ = query(collection(db, POSTS), orderBy('replyCount', 'desc'), limit(15));
+
+let topLikedPostsData = new Map();
+let topCommentedPostsData = new Map();
+
+onSnapshot(topLikedQ, (snap) => {
+  const newMap = new Map();
+  snap.forEach(d => {
+    const data = d.data();
+    const _rc = data.reportedBy?.length || 0;
+    const _mc = data.maintainedCount || 0;
+    if (!(_rc >= 7 && _rc > _mc) && (data.likeCount || 0) > 0) {
+      newMap.set(d.id, data);
+    }
+  });
+  topLikedPostsData = newMap;
+  if (activeTab === 'top') renderTrending();
+});
+
+onSnapshot(topCommentedQ, (snap) => {
+  const newMap = new Map();
+  snap.forEach(d => {
+    const data = d.data();
+    const _rc = data.reportedBy?.length || 0;
+    const _mc = data.maintainedCount || 0;
+    if (!(_rc >= 7 && _rc > _mc) && (data.replyCount || 0) > 0) {
+      newMap.set(d.id, data);
+    }
+  });
+  topCommentedPostsData = newMap;
+  if (activeTab === 'top') renderTrending();
+});
+
 function renderTrending() {
   updateTabCounts();
   feed.classList.remove('feed-gallery');
@@ -1482,8 +1563,8 @@ function renderTrending() {
   feed.querySelector('.tab-empty')?.remove();
   loadSentinel.remove();
 
-  const likedPosts     = getPostsForTab('top');
-  const commentedPosts = getTopCommented();
+  const likedPosts = Array.from(topLikedPostsData.entries()).sort((a,b) => (b[1].likeCount||0) - (a[1].likeCount||0)).slice(0, 10);
+  const commentedPosts = Array.from(topCommentedPostsData.entries()).sort((a,b) => (b[1].replyCount||0) - (a[1].replyCount||0)).slice(0, 10);
 
   // ── Liked section ──────────────────────────────────────────
   let likedStrip   = feed.querySelector('.rank-strip--liked');
@@ -2300,3 +2381,33 @@ function wireLightboxComposer(composerEl, postId) {
     container.appendChild(p);
   }
 })();
+
+// ═══════════════════════════════════════════
+// OFFLINE MODE
+// ═══════════════════════════════════════════
+const offlineScreen = document.getElementById('offlineScreen');
+const offlineDownloadPdfBtn = document.getElementById('offlineDownloadPdfBtn');
+
+if (offlineDownloadPdfBtn) {
+  offlineDownloadPdfBtn.addEventListener('click', async () => {
+    if (!me) {
+      showToast('crie um perfil para ter posts');
+      return;
+    }
+    await downloadMyPostsAsPDF();
+  });
+}
+
+let wasOffline = false;
+onSnapshot(doc(db, 'hangul_config', 'system'), (snap) => {
+  if (snap.exists() && snap.data().isOffline) {
+    document.querySelector('.app-shell')?.classList.add('hidden');
+    document.querySelector('.topbar')?.classList.add('hidden');
+    document.getElementById('onboardingOverlay')?.classList.add('hidden');
+    document.getElementById('feedSearchBar')?.classList.add('hidden');
+    offlineScreen?.classList.remove('hidden');
+    wasOffline = true;
+  } else if (wasOffline) {
+    location.reload();
+  }
+});
