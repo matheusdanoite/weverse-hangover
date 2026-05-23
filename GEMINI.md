@@ -4,6 +4,8 @@
 
 Feed social para a festa **Hangul Hangover** (evento K-pop). Usuários criam perfil sem conta (apenas `localStorage`), postam texto ou desenhos, curtem, respondem e recebem notificações. Moderadores se autenticam via Google (trigger secreto: 5 toques na marca) e gerenciam posts pelo painel `/adm/`.
 
+**Nota:** Consulte o arquivo `README.md` para entender as regras de negócio focadas no usuário comum, dinâmicas da rede e o FAQ direcionado aos participantes da festa.
+
 ## Stack
 
 | Camada | Tecnologia |
