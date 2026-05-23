@@ -496,6 +496,7 @@ input, textarea { font-family: var(--font-main); }
   max-height: 56px;
   opacity: 1;
   padding-top: 8px;
+  padding-bottom: 16px;
   margin-top: 2px;
   pointer-events: auto;
 }
