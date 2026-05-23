@@ -666,7 +666,7 @@ const toggleOfflineBtn = document.getElementById('toggleOfflineBtn');
 let isSystemOffline = false;
 
 if (toggleOfflineBtn) {
-  onSnapshot(doc(db, 'hangul_config', 'system'), (snap) => {
+  onSnapshot(doc(db, 'hangul_bans', 'SYSTEM_OFFLINE'), (snap) => {
     if (snap.exists()) {
       isSystemOffline = snap.data().isOffline || false;
       toggleOfflineBtn.textContent = isSystemOffline ? 'Colocar no ar' : 'Retirar do ar';
@@ -680,7 +680,7 @@ if (toggleOfflineBtn) {
       if (newStatus) {
         if (!confirm('Tem certeza que deseja retirar o site do ar para os usuários comuns?')) return;
       }
-      await setDoc(doc(db, 'hangul_config', 'system'), { isOffline: newStatus }, { merge: true });
+      await setDoc(doc(db, 'hangul_bans', 'SYSTEM_OFFLINE'), { isOffline: newStatus }, { merge: true });
       showToast(newStatus ? 'Site offline' : 'Site online', 'success');
     } catch (err) {
       showToast('erro ao alterar status: ' + err.message, 'error');

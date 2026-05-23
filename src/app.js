@@ -2399,7 +2399,7 @@ if (offlineDownloadPdfBtn) {
 }
 
 let wasOffline = false;
-onSnapshot(doc(db, 'hangul_config', 'system'), (snap) => {
+onSnapshot(doc(db, 'hangul_bans', 'SYSTEM_OFFLINE'), (snap) => {
   if (snap.exists() && snap.data().isOffline) {
     document.querySelector('.app-shell')?.classList.add('hidden');
     document.querySelector('.topbar')?.classList.add('hidden');
