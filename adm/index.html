@@ -5,6 +5,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" type="image/png" href="/icon.png" />
+  <link rel="apple-touch-icon" href="/icon.png" />
   <title>ADM — Weverse Hangover</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -59,16 +61,6 @@
       flex-shrink: 0;
     }
     .btn-reports:hover { background: var(--surface-hover); color: var(--text-primary); }
-    .btn-reports.has-reports { border-color: rgba(255,59,59,.5); color: var(--red); }
-
-    .reports-badge {
-      position: absolute; top: -3px; right: -3px;
-      background: var(--red); color: #fff;
-      font-size: .58rem; font-weight: 700;
-      padding: 1px 5px; border-radius: 20px;
-      min-width: 16px; text-align: center; line-height: 1.6;
-      pointer-events: none;
-    }
 
     /* ── Stats bar ── */
     .stats-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -110,28 +102,67 @@
       border-radius: 14px; padding: 14px; margin-bottom: 16px;
     }
     .compose-row { display: flex; gap: 12px; align-items: flex-start; }
-    .compose-avatar {
-      width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
+
+    .compose-avatar-btn {
+      position: relative; width: 42px; height: 42px; flex-shrink: 0;
+      cursor: pointer; border-radius: 50%; overflow: hidden;
       border: 1px solid var(--border-strong);
+    }
+    .compose-avatar {
+      width: 42px; height: 42px; border-radius: 50%;
       background-size: 130% 130%; background-position: center center;
     }
-    .compose-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+    .compose-avatar-overlay {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,.55); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity .15s; border-radius: 50%;
+    }
+    .compose-avatar-btn:hover .compose-avatar-overlay { opacity: 1; }
+    .compose-avatar-btn.has-photo .compose-avatar-overlay { opacity: .55; }
+    .compose-avatar-btn.has-photo:hover .compose-avatar-overlay { opacity: 1; }
+
+    .compose-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+
+    .compose-custom-name {
+      width: 100%; background: transparent;
+      border: none; border-bottom: 1px solid var(--border-subtle);
+      outline: none; color: var(--purple-accent);
+      font-size: .88rem; font-weight: 600; font-family: inherit;
+      padding: 3px 0 6px;
+      caret-color: var(--purple-accent);
+      transition: border-color .2s;
+    }
+    .compose-custom-name:focus { border-color: var(--purple-accent); }
+    .compose-custom-name::placeholder { color: var(--text-muted); font-weight: 400; }
+
     .compose-textarea {
       width: 100%; background: transparent; border: none; outline: none;
-      color: var(--text-primary); font-size: .95rem;
+      color: var(--text-primary); font-size: .95rem; font-family: inherit;
       line-height: 1.5; resize: none; min-height: 44px;
       caret-color: var(--pink-neon);
     }
     .compose-textarea::placeholder { color: var(--text-muted); }
     .compose-footer {
-      display: flex; justify-content: flex-end; align-items: center; gap: 10px;
+      display: flex; align-items: center; gap: 8px;
       border-top: 1px solid var(--border-subtle); padding-top: 8px;
+      flex-wrap: wrap;
     }
-    .compose-count { font-size: .75rem; color: var(--text-muted); }
+    .compose-time-wrap {
+      display: flex; align-items: center; gap: 4px;
+      color: var(--text-muted); flex: 1; min-width: 0;
+    }
+    .compose-custom-time {
+      background: transparent; border: none; outline: none;
+      color: var(--text-muted); font-size: .72rem; font-family: inherit;
+      cursor: pointer; min-width: 0;
+    }
+    .compose-custom-time::-webkit-calendar-picker-indicator { filter: invert(.5); cursor: pointer; }
+    .compose-count { font-size: .75rem; color: var(--text-muted); flex-shrink: 0; }
     .compose-count.over { color: var(--red); }
     .compose-btn {
       background: var(--pink-neon); color: #fff;
-      padding: 7px 20px; border-radius: 20px;
+      padding: 7px 20px; border-radius: 20px; flex-shrink: 0;
       font-size: .85rem; font-weight: 700; letter-spacing: .04em;
       transition: opacity .15s, transform .1s;
     }
@@ -139,52 +170,24 @@
     .compose-btn:not(:disabled):hover { opacity: .85; }
     .compose-btn:not(:disabled):active { transform: scale(.97); }
 
+    /* ── Reports section (inline) ── */
+    .reports-section-label {
+      font-size: .72rem; font-weight: 700; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--red);
+      display: flex; align-items: center; gap: 6px;
+      margin-bottom: 8px;
+    }
+    .reports-section-label .reports-count-badge {
+      background: rgba(255,59,59,.15); color: var(--red);
+      font-size: .65rem; font-weight: 700;
+      padding: 2px 8px; border-radius: 20px;
+    }
+
     /* ── Post list ── */
     .post-list { display: flex; flex-direction: column; gap: 10px; }
     .post-list .post { border-radius: 12px; }
     .post-list .reply-btn.open { background: rgba(155,89,255,.1); color: var(--purple-accent); }
     .replies-empty { font-size: .8rem; color: var(--text-muted); padding: 4px 0 8px; }
-
-    /* ── Reports overlay ── */
-    .reports-overlay {
-      position: fixed; inset: 0; z-index: 500;
-      background: var(--bg);
-      display: flex; flex-direction: column;
-      transform: translateX(100%);
-      transition: transform .3s cubic-bezier(.4,0,.2,1);
-      overflow: hidden;
-    }
-    .reports-overlay.open { transform: translateX(0); }
-
-    .reports-overlay-header {
-      display: flex; align-items: center; gap: 10px;
-      padding: 16px 16px 14px;
-      border-bottom: 1px solid var(--border-subtle);
-      flex-shrink: 0;
-    }
-    .btn-reports-close {
-      width: 36px; height: 36px; border-radius: 50%;
-      background: var(--surface-2); border: 1px solid var(--border-subtle);
-      color: var(--text-secondary);
-      display: flex; align-items: center; justify-content: center;
-      transition: background .2s; flex-shrink: 0;
-    }
-    .btn-reports-close:hover { background: var(--surface-hover); }
-    .reports-overlay-title { font-size: 1rem; font-weight: 700; flex: 1; }
-    .reports-overlay-count {
-      font-size: .72rem; font-weight: 700;
-      background: rgba(255,59,59,.15); color: var(--red);
-      padding: 3px 9px; border-radius: 20px;
-    }
-    .reports-overlay-list {
-      flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
-      padding: 16px; display: flex; flex-direction: column; gap: 14px;
-      max-width: 860px; width: 100%; margin: 0 auto;
-    }
-    .reports-empty {
-      text-align: center; padding: 60px 20px;
-      color: var(--text-muted); font-size: .9rem;
-    }
 
     /* ── Report post item ── */
     .report-post-wrap { display: flex; flex-direction: column; gap: 6px; }
@@ -253,6 +256,72 @@
       outline: none; transition: border-color .2s; margin-bottom: 16px;
     }
     .maintain-textarea:focus { border-color: var(--green); }
+
+    /* ── Tabs ── */
+    .tab-bar { display: flex; gap: 4px; margin-bottom: 14px; background: var(--surface-1); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 4px; }
+    .tab-btn { flex: 1; padding: 7px; border-radius: 7px; font-size: .82rem; font-weight: 600; color: var(--text-muted); background: transparent; transition: background .15s, color .15s; cursor: pointer; }
+    .tab-btn.active { background: var(--surface-2); color: var(--text-primary); }
+
+    /* ── Profile selector ── */
+    .profile-selector { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle); }
+    .profile-selector-label { font-size: .68rem; letter-spacing: .1em; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; }
+    .profile-selector-list { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; }
+    .profile-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 20px; background: var(--surface-2); border: 1px solid var(--border-subtle); font-size: .78rem; color: var(--text-secondary); cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+    .profile-pill:hover { background: var(--surface-hover); }
+    .profile-pill.active { background: rgba(155,89,255,.15); border-color: var(--purple-accent); color: var(--purple-accent); }
+    .profile-pill-avatar { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; background-size: 130% 130%; background-position: center; }
+    .profile-pill.active .profile-pill-avatar { background-size: cover; }
+    .profile-pill-new { color: var(--text-muted); border-style: dashed; }
+
+    /* ── Idol list ── */
+    .idol-post-wrap { display: flex; flex-direction: column; gap: 6px; }
+    .idol-action-bar { display: flex; gap: 8px; }
+    .btn-idol-edit { flex: 1; background: rgba(0,212,255,.07); border: 1px solid rgba(0,212,255,.22); color: #00d4ff; padding: 8px 14px; border-radius: 10px; font-size: .82rem; font-weight: 600; transition: background .15s; cursor: pointer; }
+    .btn-idol-edit:hover { background: rgba(0,212,255,.16); }
+    .btn-idol-del { flex: 1; background: rgba(255,59,59,.07); border: 1px solid rgba(255,59,59,.22); color: var(--red); padding: 8px 14px; border-radius: 10px; font-size: .82rem; font-weight: 600; transition: background .15s; cursor: pointer; }
+    .btn-idol-del:hover { background: rgba(255,59,59,.16); }
+
+    /* ── Inline replies (Idols tab) ── */
+    .idol-replies-section { background: var(--surface-1); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 10px 12px; }
+    .idol-replies-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; color: var(--text-muted); cursor: pointer; background: none; border: none; padding: 0; }
+    .idol-replies-toggle.open { color: var(--purple-accent); }
+    .idol-replies-thread { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .idol-reply-item { display: flex; gap: 8px; align-items: flex-start; }
+    .idol-reply-avatar { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; background-size: 130% 130%; background-position: center; }
+    .idol-reply-body { flex: 1; min-width: 0; }
+    .idol-reply-meta { font-size: .72rem; color: var(--text-muted); margin-bottom: 2px; }
+    .idol-reply-author { color: var(--text-primary); font-weight: 600; margin-right: 5px; }
+    .idol-reply-text { font-size: .85rem; color: var(--text-primary); word-break: break-word; }
+    .idol-reply-del { background: none; border: none; color: var(--text-muted); font-size: .7rem; padding: 2px 4px; cursor: pointer; opacity: .45; flex-shrink: 0; }
+    .idol-reply-del:hover { opacity: 1; color: var(--red); }
+    .idol-reply-composer { display: flex; gap: 6px; align-items: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-subtle); }
+    .idol-reply-input { flex: 1; background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-primary); padding: 7px 10px; font-size: .82rem; font-family: inherit; outline: none; transition: border-color .2s; }
+    .idol-reply-input:focus { border-color: var(--purple-accent); }
+    .idol-reply-input::placeholder { color: var(--text-muted); }
+    .idol-reply-send { background: var(--purple-accent); color: #fff; padding: 7px 14px; border-radius: 8px; font-size: .78rem; font-weight: 700; flex-shrink: 0; transition: opacity .15s; cursor: pointer; }
+    .idol-reply-send:disabled { opacity: .35; cursor: not-allowed; }
+
+    /* ── Edit modal ── */
+    .edit-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.72); display: flex; align-items: center; justify-content: center; z-index: 9999; backdrop-filter: blur(4px); }
+    .edit-modal-card { background: #1e0d35; border: 1px solid var(--border-strong); border-radius: 16px; padding: 24px; max-width: 380px; width: 90%; display: flex; flex-direction: column; gap: 12px; }
+    .edit-modal-title { font-size: 1rem; font-weight: 700; }
+    .edit-modal-textarea { width: 100%; background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-primary); padding: 10px 12px; font-size: .88rem; font-family: inherit; line-height: 1.4; resize: none; min-height: 90px; outline: none; transition: border-color .2s; }
+    .edit-modal-textarea:focus { border-color: var(--purple-accent); }
+    .edit-modal-time { background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-muted); padding: 9px 12px; font-size: .82rem; font-family: inherit; outline: none; width: 100%; transition: border-color .2s; }
+    .edit-modal-time::-webkit-calendar-picker-indicator { filter: invert(.5); cursor: pointer; }
+    .edit-modal-time:focus { border-color: var(--purple-accent); }
+    .edit-modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .btn-edit-cancel { background: var(--surface-2); border: 1px solid var(--border-subtle); color: var(--text-secondary); padding: 8px 18px; border-radius: 8px; font-size: .85rem; cursor: pointer; }
+    .btn-edit-save { background: var(--purple-accent); color: #fff; padding: 8px 18px; border-radius: 8px; font-size: .85rem; font-weight: 700; cursor: pointer; transition: opacity .15s; }
+    .btn-edit-save:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ── Mini reply profile selector ── */
+    .reply-profile-selector { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--border-subtle); }
+    .reply-profile-label { font-size: .64rem; color: var(--text-muted); letter-spacing: .08em; text-transform: uppercase; flex-shrink: 0; }
+    .reply-profile-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--border-subtle); font-size: .72rem; color: var(--text-secondary); cursor: pointer; transition: background .12s, border-color .12s, color .12s; }
+    .reply-profile-pill:hover { background: var(--surface-hover); }
+    .reply-profile-pill.active { background: rgba(155,89,255,.15); border-color: var(--purple-accent); color: var(--purple-accent); }
+    .reply-profile-pill-avatar { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; background-size: cover; background-position: center; }
   </style>
 </head>
 
@@ -297,13 +366,6 @@
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
         </button>
-        <button id="reportsBtn" class="btn-reports" title="Denúncias">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
-            <line x1="4" y1="22" x2="4" y2="15"/>
-          </svg>
-          <span class="reports-badge hidden" id="reportsBadge"></span>
-        </button>
       </div>
     </header>
 
@@ -311,14 +373,42 @@
       <input type="search" id="searchInput" class="search-input" style="width:100%; box-sizing:border-box;" placeholder="buscar por autor ou conteúdo…" />
     </div>
 
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tabReports">Denúncias</button>
+      <button class="tab-btn" id="tabIdols">Idols</button>
+      <button class="tab-btn" id="tabFeed">Feed</button>
+    </div>
+
     <!-- Composer -->
-    <section class="compose-section">
+    <section id="composeSection" class="compose-section">
+      <input type="file" id="composeAvatarInput" accept="image/*" style="display:none">
+      <div id="profileSelector" class="profile-selector" style="display:none;">
+        <div class="profile-selector-label">postar como:</div>
+        <div id="profileSelectorList" class="profile-selector-list"></div>
+      </div>
       <div class="compose-row">
-        <div class="compose-avatar" id="composeAvatar"></div>
+        <div class="compose-avatar-btn" id="composeAvatarBtn" title="Clique para selecionar foto de perfil">
+          <div class="compose-avatar" id="composeAvatar"></div>
+          <div class="compose-avatar-overlay">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+          </div>
+        </div>
         <div class="compose-body">
+          <input type="text" id="composeCustomName" class="compose-custom-name"
+            placeholder="nome de perfil customizado (opcional)…" maxlength="40"
+            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
           <textarea id="composeText" class="compose-textarea" maxlength="300"
             placeholder="diga algo para a galera…" rows="2"></textarea>
           <div class="compose-footer">
+            <div class="compose-time-wrap">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+              <input type="datetime-local" id="composeCustomTime" class="compose-custom-time">
+            </div>
             <span class="compose-count" id="composeCount">0/300</span>
             <button id="composeBtn" class="compose-btn" disabled>postar</button>
           </div>
@@ -326,23 +416,30 @@
       </div>
     </section>
 
-    <!-- Feed -->
-    <div id="postList" class="post-list"></div>
-
-  </div>
-
-  <!-- Reports overlay (full-screen, slides in from right) -->
-  <div id="reportsOverlay" class="reports-overlay">
-    <div class="reports-overlay-header">
-      <button id="reportsClose" class="btn-reports-close" type="button" title="Voltar">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="15 18 9 12 15 6"/>
-        </svg>
-      </button>
-      <span class="reports-overlay-title">denúncias</span>
-      <span class="reports-overlay-count hidden" id="reportsOverlayCount"></span>
+    <div id="reportsSectionLabel" class="reports-section-label" style="display:none;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+        <line x1="4" y1="22" x2="4" y2="15"/>
+      </svg>
+      denúncias pendentes
+      <span class="reports-count-badge" id="postsCountTools"></span>
     </div>
-    <div id="reportsOverlayList" class="reports-overlay-list"></div>
+    <div id="reportsList" class="post-list"></div>
+    <div id="idolsList" class="post-list" style="display:none;"></div>
+    <div id="feedList"  class="post-list" style="display:none;"></div>
+
+    <div id="countdownSettingsPanel" style="margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border-subtle); display: flex; flex-direction: column; align-items: center; gap: 12px;">
+      <h3 style="font-size: 1rem; color: var(--pink-neon);">Contagem Regressiva</h3>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <input type="datetime-local" id="countdownTimeInput" class="search-input" style="min-width: 200px;">
+        <button id="toggleCountdownBtn" class="btn-report-maintain" style="padding: 9px 20px;">Iniciar</button>
+      </div>
+    </div>
+
+    <footer style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: center;">
+      <button id="toggleOfflineBtn" class="btn-report-del" style="max-width: 200px;">Retirar do ar</button>
+    </footer>
+
   </div>
 
   <!-- Loading -->
@@ -387,571 +484,20 @@
     </div>
   </div>
 
-  <script type="module" src="./adm.js">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js';
-    import {
-      getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
-    } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js';
-    import {
-      getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, setDoc,
-      serverTimestamp, query, orderBy, getDocs, limit, increment
-    } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js';
-    import { getMessaging, getToken } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-messaging.js';
-    import {
-      gradientCSS, escapeHTML, formatTimeAbs,
-      buildPostCard, updatePostCard,
-    } from '../src/shared.js';
+  <!-- Edit modal -->
+  <div id="editModalOverlay" class="edit-modal-overlay hidden">
+    <div class="edit-modal-card">
+      <div class="edit-modal-title">Editar post</div>
+      <textarea id="editModalText" class="edit-modal-textarea" maxlength="300" placeholder="texto do post…"></textarea>
+      <input type="datetime-local" id="editModalTime" class="edit-modal-time">
+      <div class="edit-modal-actions">
+        <button id="editModalCancel" class="btn-edit-cancel">cancelar</button>
+        <button id="editModalSave" class="btn-edit-save">salvar</button>
+      </div>
+    </div>
+  </div>
 
-    // Moderator profiles fetched from server — emails never exposed in client JS
-    const firebaseConfig = await fetch('/api/config').then(r => r.json());
-    const MODERATORS = Object.fromEntries(
-      (firebaseConfig.moderatorProfiles || []).map(p => [p.email, p])
-    );
-    const MOD_NAMES = new Set(Object.values(MODERATORS).map(p => p.name));
-
-    const POSTS = 'hangul_messages';
-
-    const app  = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db   = getFirestore(app);
-
-    // ── DOM ──
-    const loginScreen        = document.getElementById('loginScreen');
-    const adminShell         = document.getElementById('adminShell');
-    const loadingScreen      = document.getElementById('loadingScreen');
-    const loginBtn           = document.getElementById('loginBtn');
-    const reportsBtn         = document.getElementById('reportsBtn');
-    const reportsOverlay     = document.getElementById('reportsOverlay');
-    const reportsClose       = document.getElementById('reportsClose');
-    const reportsOverlayCount= document.getElementById('reportsOverlayCount');
-    const reportsOverlayList = document.getElementById('reportsOverlayList');
-    const reportsBadge       = document.getElementById('reportsBadge');
-    const enablePushBtn      = document.getElementById('enablePushBtn');
-    const searchToggleBtn    = document.getElementById('searchToggleBtn');
-    const searchBar          = document.getElementById('searchBar');
-    const searchInput        = document.getElementById('searchInput');
-    const postList           = document.getElementById('postList');
-    const postsCountTools    = document.getElementById('postsCountTools');
-    const composeAvatar      = document.getElementById('composeAvatar');
-    const composeText        = document.getElementById('composeText');
-    const composeCount       = document.getElementById('composeCount');
-    const composeBtn         = document.getElementById('composeBtn');
-    const toastEl            = document.getElementById('toast');
-    const confirmOverlay     = document.getElementById('confirmOverlay');
-    const confirmTitle       = document.getElementById('confirmTitle');
-    const confirmDesc        = document.getElementById('confirmDesc');
-    const confirmCancel      = document.getElementById('confirmCancel');
-    const confirmOk          = document.getElementById('confirmOk');
-    const maintainOverlay    = document.getElementById('maintainOverlay');
-    const maintainDesc       = document.getElementById('maintainDesc');
-    const maintainNoteWrap   = document.getElementById('maintainNoteWrap');
-    const maintainNoteInput  = document.getElementById('maintainNoteInput');
-    const maintainCancel     = document.getElementById('maintainCancel');
-    const maintainOk         = document.getElementById('maintainOk');
-
-    let allPosts        = [];
-    let modProfile      = null;
-    let pendingConfirm  = null;
-    let pendingMaintain = null;
-    let toastTimer      = null;
-
-    // ── Toast ──
-    function showToast(text, type = '') {
-      toastEl.textContent = text;
-      toastEl.className = 'toast show' + (type ? ' ' + type : '');
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2600);
-    }
-
-    // ── Confirm (delete) ──
-    function openConfirm(title, desc, onOk) {
-      confirmTitle.textContent = title;
-      confirmDesc.textContent  = desc;
-      confirmOverlay.classList.remove('hidden');
-      pendingConfirm = onOk;
-    }
-    confirmCancel.addEventListener('click', () => {
-      confirmOverlay.classList.add('hidden');
-      pendingConfirm = null;
-    });
-    confirmOk.addEventListener('click', () => {
-      confirmOverlay.classList.add('hidden');
-      if (pendingConfirm) { pendingConfirm(); pendingConfirm = null; }
-    });
-
-    // ── Manter dialog ──
-    function openMaintainDialog(post, onOk) {
-      const count = post.reportedBy?.length || 0;
-      const needsNote = count >= 3;
-      maintainDesc.textContent = `Post de @${post.author || 'anônimo'} com ${count} denúncia${count !== 1 ? 's' : ''}. O post voltará a ser visível para todos.`;
-      maintainNoteWrap.classList.toggle('hidden', !needsNote);
-      maintainNoteInput.value = '';
-      maintainOk.disabled = needsNote;
-      maintainOverlay.classList.remove('hidden');
-      pendingMaintain = { post, onOk, needsNote };
-      if (needsNote) setTimeout(() => maintainNoteInput.focus(), 100);
-    }
-
-    maintainNoteInput.addEventListener('input', () => {
-      if (pendingMaintain?.needsNote) {
-        maintainOk.disabled = maintainNoteInput.value.trim().length === 0;
-      }
-    });
-
-    maintainCancel.addEventListener('click', () => {
-      maintainOverlay.classList.add('hidden');
-      pendingMaintain = null;
-    });
-
-    maintainOk.addEventListener('click', () => {
-      if (!pendingMaintain) return;
-      if (pendingMaintain.needsNote && !maintainNoteInput.value.trim()) return;
-      const note = maintainNoteInput.value.trim();
-      const { post, onOk } = pendingMaintain;
-      maintainOverlay.classList.add('hidden');
-      pendingMaintain = null;
-      onOk(post, note);
-    });
-
-    // ── Auth ──
-    loginBtn.addEventListener('click', async () => {
-      try { await signInWithPopup(auth, new GoogleAuthProvider()); }
-      catch (e) { showToast('erro ao entrar: ' + e.message, 'error'); }
-    });
-
-    onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        loadingScreen.classList.add('hidden');
-        loginScreen.classList.remove('hidden');
-        adminShell.classList.add('hidden');
-        return;
-      }
-      if (!MODERATORS[user.email]) {
-        await signOut(auth);
-        showToast('acesso negado', 'error');
-        loadingScreen.classList.add('hidden');
-        loginScreen.classList.remove('hidden');
-        return;
-      }
-      modProfile = MODERATORS[user.email];
-      loginScreen.classList.add('hidden');
-      loadingScreen.classList.add('hidden');
-      adminShell.classList.remove('hidden');
-      adminShell.classList.add('tools-active');
-      composeAvatar.style.backgroundImage = gradientCSS(modProfile.gradient);
-      loadPosts();
-      
-      // Initialize Web Push for Moderators
-      if ('serviceWorker' in navigator && 'Notification' in window) {
-        if (Notification.permission === 'default') {
-          enablePushBtn.style.display = 'flex';
-        } else if (Notification.permission === 'granted') {
-          setupFCM();
-        }
-      }
-    });
-
-    async function setupFCM() {
-      try {
-        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-        const messaging = getMessaging(app);
-        const currentToken = await getToken(messaging, { 
-          vapidKey: 'BDWpogUdy0kNGEdHXCBE1Qvi_w49ABjRT20UT0CeZelZaeiqAwoSGi_ck1un1esau9jzy86mF_1Ver-L8rTpmQM',
-          serviceWorkerRegistration: registration
-        });
-        if (currentToken && modProfile) {
-          await setDoc(doc(db, 'hangul_fcm_tokens', modProfile.id), {
-            token: currentToken,
-            role: 'mod',
-            updatedAt: serverTimestamp()
-          });
-          enablePushBtn.style.display = 'none';
-        }
-      } catch (err) {
-        console.log('FCM setup failed or blocked:', err);
-      }
-    }
-
-    enablePushBtn.addEventListener('click', async () => {
-      const permission = await Notification.requestPermission();
-      if (permission === 'granted') {
-        setupFCM();
-      } else {
-        enablePushBtn.style.display = 'none';
-      }
-    });
-
-    // ── Reports overlay ──
-    reportsBtn.addEventListener('click', () => reportsOverlay.classList.add('open'));
-    reportsClose.addEventListener('click', () => reportsOverlay.classList.remove('open'));
-
-    // ── Admin Composer ──
-    composeText.addEventListener('input', () => {
-      const len = composeText.value.length;
-      composeCount.textContent = `${len}/300`;
-      composeCount.classList.toggle('over', len > 300);
-      composeBtn.disabled = len === 0 || len > 300;
-      composeText.style.height = 'auto';
-      composeText.style.height = composeText.scrollHeight + 'px';
-    });
-
-    composeBtn.addEventListener('click', async () => {
-      const text = composeText.value.trim();
-      if (!text || !modProfile) return;
-      composeBtn.disabled = true;
-      composeBtn.textContent = '…';
-      try {
-        await addDoc(collection(db, POSTS), {
-          type: 'text', message: text,
-          author: modProfile.name, authorId: modProfile.id,
-          gradient: modProfile.gradient,
-          likedBy: [], replyCount: 0,
-          createdAt: serverTimestamp(),
-        });
-        composeText.value = '';
-        composeText.style.height = 'auto';
-        composeCount.textContent = '0/300';
-        showToast('postado!', 'success');
-        await loadPosts();
-      } catch (e) {
-        showToast('erro ao postar: ' + e.message, 'error');
-      } finally {
-        composeBtn.disabled = false;
-        composeBtn.textContent = 'postar';
-      }
-    });
-
-    // ── Search toggle ──
-    searchToggleBtn.addEventListener('click', () => {
-      if (searchBar.style.display === 'none') {
-        searchBar.style.display = 'block';
-        searchInput.focus();
-      } else {
-        searchBar.style.display = 'none';
-        searchInput.value = '';
-        renderPosts();
-      }
-    });
-
-    // ── Load posts ──
-    async function loadPosts() {
-      postList.innerHTML = `<div class="state-loading">
-        <svg class="spinner" width="26" height="26" viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="10" stroke="rgba(255,45,120,0.3)" stroke-width="3" fill="none"/>
-          <path d="M12 2a10 10 0 0 1 10 10" stroke="#ff2d78" stroke-width="3" fill="none" stroke-linecap="round"/>
-        </svg></div>`;
-      try {
-        const q    = query(collection(db, POSTS), orderBy('createdAt', 'desc'), limit(120));
-        const snap = await getDocs(q);
-        allPosts   = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
-        updateReports();
-        renderPosts();
-      } catch (e) {
-        postList.innerHTML = `<div class="state-empty"><p>erro: ${escapeHTML(String(e.message || e))}</p></div>`;
-        showToast('erro ao carregar', 'error');
-      }
-    }
-
-    // ── Reports ──
-    function updateReports() {
-      // A post needs review when it has more reports than the last maintained count
-      const pending = allPosts
-        .filter(p => (p.reportedBy?.length || 0) > (p.maintainedCount || 0))
-        .sort((a, b) => {
-          const da = (a.reportedBy?.length || 0) - (a.maintainedCount || 0);
-          const db2= (b.reportedBy?.length || 0) - (b.maintainedCount || 0);
-          return db2 - da;
-        });
-
-      if (pending.length > 0) {
-        reportsBadge.textContent = pending.length;
-        reportsBadge.classList.remove('hidden');
-        reportsBtn.classList.add('has-reports');
-      } else {
-        reportsBadge.classList.add('hidden');
-        reportsBtn.classList.remove('has-reports');
-      }
-
-      reportsOverlayCount.textContent = `${pending.length} post${pending.length !== 1 ? 's' : ''}`;
-      reportsOverlayCount.classList.toggle('hidden', pending.length === 0);
-
-      reportsOverlayList.innerHTML = '';
-      if (pending.length === 0) {
-        reportsOverlayList.innerHTML = `<div class="reports-empty">sem denúncias pendentes ✓</div>`;
-        return;
-      }
-
-      pending.forEach(post => reportsOverlayList.appendChild(buildReportItem(post)));
-    }
-
-    function buildReportItem(post) {
-      const wrap = document.createElement('div');
-      wrap.className = 'report-post-wrap';
-
-      // Post card (read-only — no like/reply/delete handlers)
-      const card = buildPostCard(post.docId, post, {
-        me: modProfile,
-        modNames: MOD_NAMES,
-        formatTimeFn: formatTimeAbs,
-      });
-      wrap.appendChild(card);
-
-      // Action bar
-      const actionBar = document.createElement('div');
-      actionBar.className = 'report-action-bar';
-
-      const delBtn = document.createElement('button');
-      delBtn.className = 'btn-report-del';
-      delBtn.type = 'button';
-      delBtn.textContent = 'Deletar';
-      delBtn.addEventListener('click', () => {
-        const count = post.reportedBy?.length || 0;
-        openConfirm(
-          'Deletar post denunciado?',
-          `De @${post.author || 'anônimo'} — ${count} denúncia${count !== 1 ? 's' : ''}. Ação permanente.`,
-          async () => {
-            try {
-              await deleteDoc(doc(db, POSTS, post.docId));
-              allPosts = allPosts.filter(p => p.docId !== post.docId);
-              updateReports();
-              renderPosts();
-              showToast('post deletado', 'success');
-            } catch (e) {
-              showToast('erro: ' + e.message, 'error');
-            }
-          }
-        );
-      });
-
-      const maintainBtn = document.createElement('button');
-      maintainBtn.className = 'btn-report-maintain';
-      maintainBtn.type = 'button';
-      maintainBtn.textContent = 'Manter';
-      maintainBtn.addEventListener('click', () => {
-        openMaintainDialog(post, (post, note) => doMaintainPost(post, note));
-      });
-
-      actionBar.appendChild(delBtn);
-      actionBar.appendChild(maintainBtn);
-      wrap.appendChild(actionBar);
-
-      return wrap;
-    }
-
-    async function doMaintainPost(post, note) {
-      try {
-        const updateData = { maintainedCount: post.reportedBy?.length || 0 };
-        if (note) updateData.maintainNote = note;
-        await updateDoc(doc(db, POSTS, post.docId), updateData);
-        allPosts = allPosts.map(p =>
-          p.docId === post.docId
-            ? { ...p, maintainedCount: updateData.maintainedCount, ...(note ? { maintainNote: note } : {}) }
-            : p
-        );
-        updateReports();
-        renderPosts();
-        showToast('post mantido', 'success');
-      } catch (e) {
-        showToast('erro: ' + e.message, 'error');
-      }
-    }
-
-    // ── Render feed ──
-    function renderPosts() {
-      const search = searchInput.value.toLowerCase().trim();
-      const filtered = allPosts.filter(p => {
-        if (search) {
-          const ok = (p.author || '').toLowerCase().includes(search)
-                  || (p.message || '').toLowerCase().includes(search);
-          if (!ok) return false;
-        }
-        return true;
-      });
-      if (postsCountTools) postsCountTools.textContent = `${filtered.length} post${filtered.length !== 1 ? 's' : ''}`;
-      if (!filtered.length) {
-        postList.innerHTML = `<div class="state-empty"><p>nenhum post encontrado</p></div>`;
-        return;
-      }
-      postList.innerHTML = '';
-      filtered.forEach(p => postList.appendChild(buildAdminPostCard(p)));
-    }
-
-    function buildAdminPostCard(post) {
-      return buildPostCard(post.docId, post, {
-        me: modProfile,
-        modNames: MOD_NAMES,
-        formatTimeFn: formatTimeAbs,
-        onDelete: (id, el) => confirmDelete(post, el),
-        onReplyClick: (el) => toggleRepliesSection(post, el),
-      });
-    }
-
-    // ── Replies section (on-demand toggle) ──
-    async function toggleRepliesSection(post, articleEl) {
-      const section  = articleEl.querySelector('.replies-section');
-      const replyBtn = articleEl.querySelector('.reply-btn');
-
-      if (section.children.length > 0) {
-        section.innerHTML = '';
-        replyBtn.classList.remove('open');
-        return;
-      }
-
-      replyBtn.classList.add('open');
-      const thread = document.createElement('div');
-      thread.className = 'reply-thread';
-
-      try {
-        const q    = query(collection(db, POSTS, post.docId, 'replies'), orderBy('createdAt', 'asc'));
-        const snap = await getDocs(q);
-        if (snap.empty) {
-          const empty = document.createElement('p');
-          empty.className = 'replies-empty';
-          empty.textContent = 'ainda sem respostas';
-          thread.appendChild(empty);
-        } else {
-          snap.forEach(d => thread.appendChild(buildReplyItem(d.id, d.data(), post.docId)));
-        }
-      } catch (e) {
-        showToast('erro ao carregar respostas', 'error');
-      }
-
-      section.appendChild(thread);
-      section.appendChild(buildReplyComposer(post.docId, thread, post));
-    }
-
-    function buildReplyItem(replyId, r, postId) {
-      const item = document.createElement('div');
-      item.className = 'thread-item';
-
-      const av = document.createElement('div');
-      av.className = 'avatar avatar-sm';
-      av.style.backgroundImage = gradientCSS(r.gradient);
-      item.appendChild(av);
-
-      const body = document.createElement('div');
-      body.className = 'reply-body';
-      body.innerHTML = `
-        <div class="reply-header">
-          <span class="reply-author">${escapeHTML(r.author || 'anônimo')}</span>
-          <span class="reply-time">${formatTimeAbs(r.createdAt)}</span>
-        </div>
-        <div class="reply-content">
-          ${r.type === 'drawing' && typeof r.message === 'string' && /^data:image\/(png|jpeg|gif|webp);base64,/.test(r.message)
-            ? `<img class="post-drawing" src="${r.message}" alt="desenho" loading="lazy" />`
-            : escapeHTML(r.message || '')
-          }
-        </div>
-      `;
-      item.appendChild(body);
-
-      const delBtn = document.createElement('button');
-      delBtn.className = 'reply-delete';
-      delBtn.textContent = '✕';
-      delBtn.title = `deletar resposta de @${r.author || 'anônimo'}`;
-      delBtn.addEventListener('click', async () => {
-        if (!confirm(`Deletar resposta de @${r.author || 'anônimo'}?`)) return;
-        try {
-          await deleteDoc(doc(db, POSTS, postId, 'replies', replyId));
-          item.remove();
-          showToast('resposta deletada', 'success');
-        } catch (e) {
-          showToast('erro: ' + e.message, 'error');
-        }
-      });
-      item.appendChild(delBtn);
-
-      return item;
-    }
-
-    function buildReplyComposer(postId, threadEl, post) {
-      const wrap = document.createElement('div');
-      wrap.className = 'reply-composer';
-
-      const av = document.createElement('div');
-      av.className = 'avatar avatar-sm';
-      av.style.backgroundImage = modProfile ? gradientCSS(modProfile.gradient) : '';
-      wrap.appendChild(av);
-
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.className = 'reply-input';
-      input.placeholder = 'escrever resposta…';
-      input.maxLength = 200;
-      wrap.appendChild(input);
-
-      const send = document.createElement('button');
-      send.className = 'reply-send';
-      send.disabled = true;
-      send.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-      </svg>`;
-      wrap.appendChild(send);
-
-      input.addEventListener('input', () => { send.disabled = input.value.trim().length === 0; });
-
-      const submit = async () => {
-        const txt = input.value.trim();
-        if (!txt || !modProfile) return;
-        send.disabled = true;
-        try {
-          await addDoc(collection(db, POSTS, postId, 'replies'), {
-            type: 'text', message: txt,
-            author: modProfile.name, authorId: modProfile.id,
-            gradient: modProfile.gradient, createdAt: serverTimestamp(),
-          });
-          await updateDoc(doc(db, POSTS, postId), { replyCount: increment(1) });
-          threadEl.querySelector('.replies-empty')?.remove();
-          const fakeTs = { toDate: () => new Date() };
-          threadEl.appendChild(buildReplyItem('_local_' + Date.now(), {
-            type: 'text', message: txt,
-            author: modProfile.name, gradient: modProfile.gradient,
-            createdAt: fakeTs,
-          }, postId));
-          const localPost = allPosts.find(p => p.docId === postId);
-          if (localPost) localPost.replyCount = (localPost.replyCount || 0) + 1;
-          post.replyCount = (post.replyCount || 0) + 1;
-          input.value = '';
-          showToast('resposta enviada!', 'success');
-        } catch (e) {
-          showToast('erro: ' + e.message, 'error');
-        } finally {
-          send.disabled = input.value.trim().length === 0;
-        }
-      };
-
-      send.addEventListener('click', submit);
-      input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
-
-      return wrap;
-    }
-
-    // ── Delete post ──
-    function confirmDelete(post, el) {
-      const preview = post.type === 'drawing' ? '[desenho]' : `"${(post.message || '').slice(0, 60)}…"`;
-      openConfirm(
-        'Deletar post?',
-        `De @${post.author || 'anônimo'}: ${preview}\n\nEsta ação é permanente.`,
-        () => doDeletePost(post, el)
-      );
-    }
-
-    async function doDeletePost(post, el) {
-      el.classList.add('deleting');
-      try {
-        await deleteDoc(doc(db, POSTS, post.docId));
-        allPosts = allPosts.filter(p => p.docId !== post.docId);
-        el.remove();
-        showToast('post deletado', 'success');
-      } catch (e) {
-        el.classList.remove('deleting');
-        showToast('erro: ' + e.message, 'error');
-      }
-    }
-
-    // ── Events ──
-    searchInput.addEventListener('input', renderPosts);
-  </script>
+  <script type="module" src="./adm.js"></script>
 
 </body>
 </html>

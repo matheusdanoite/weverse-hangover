@@ -12,8 +12,8 @@ import {
   where, getDocs, deleteDoc, getDoc, setDoc
 } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js';
 import {
-  gradientCSS, setGradientBg, escapeHTML,
-  formatTime, buildPostCard, updatePostCard,
+  gradientCSS, setGradientBg, escapeHTML, highlightMentions,
+  formatTime, buildPostCard, updatePostCard, openLightbox,
 } from './shared.js';
 
 // ── Firebase + moderator profiles (fetched from server — emails never in client JS) ──
@@ -23,9 +23,11 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const POSTS = 'hangul_messages';
 const USERS = 'hangul_usernames';
+const BANS = 'hangul_bans';
+const MENTIONS = 'hangul_mentions';
 
 const MOD_NAMES = new Set((firebaseConfig.moderatorProfiles || []).map(p => p.name));
-const MOD_IDS   = new Set((firebaseConfig.moderatorProfiles || []).map(p => p.id));
+const MOD_IDS = new Set((firebaseConfig.moderatorProfiles || []).map(p => p.id));
 const GOOGLE_PROVIDER = new GoogleAuthProvider();
 
 // ═══════════════════════════════════════════
@@ -36,6 +38,7 @@ const LS = {
   PREV_USER: 'hangul.prevUser',
   SEEN: 'hangul.seenPosts',
   BASE: 'hangul.notifsBase',
+  MENTIONS_SEEN: 'hangul.mentionsSeen',
 };
 
 function uuid() {
@@ -63,10 +66,21 @@ function loadBaseline() {
 }
 function saveBaseline(b) { localStorage.setItem(LS.BASE, JSON.stringify(b)); }
 
+function loadMentionsSeen() {
+  try { return new Set(JSON.parse(localStorage.getItem(LS.MENTIONS_SEEN)) || []); }
+  catch { return new Set(); }
+}
+function saveMentionsSeen(s) {
+  localStorage.setItem(LS.MENTIONS_SEEN, JSON.stringify(Array.from(s)));
+}
+
 let me = loadUser();
 const seenAtStart = loadSeen();
 const seenThisSession = new Set();
 let notifBaseline = loadBaseline();
+let mentionsData = [];
+let mentionsSeen = loadMentionsSeen();
+let _mentionsUnsub = null;
 
 
 // ═══════════════════════════════════════════
@@ -92,9 +106,9 @@ termsCheck.addEventListener('change', () => {
 // ONBOARDING
 // ═══════════════════════════════════════════
 const PALETTE = [
-  '#ff2d78','#9b59ff','#00d4ff','#ff6ba6','#ffb800',
-  '#34e89e','#fc466b','#3f5efb','#f7971e','#ffd200',
-  '#d926a9','#0f3443','#e040fb','#00bcd4','#ff5722',
+  '#ff2d78', '#9b59ff', '#00d4ff', '#ff6ba6', '#ffb800',
+  '#34e89e', '#fc466b', '#3f5efb', '#f7971e', '#ffd200',
+  '#d926a9', '#0f3443', '#e040fb', '#00bcd4', '#ff5722',
 ];
 
 function randomColor() {
@@ -147,7 +161,7 @@ onboardName.addEventListener('input', () => {
 onboardSubmit.addEventListener('click', async () => {
   if (!termsCheck.checked) return;
   const name = onboardName.value.trim();
-  if (!name) {
+  if (name.length < 2) {
     onboardName.focus();
     onboardName.style.borderColor = 'var(--pink-neon)';
     onboardName.style.boxShadow = '0 0 0 3px var(--pink-glow)';
@@ -192,7 +206,7 @@ onboardSubmit.addEventListener('click', async () => {
 
     onboardOverlay.classList.add('hidden');
     paintUserUI();
-    updateReplyCcomposersGradient();
+    listenMentions();
   } finally {
     onboardSubmit.disabled = !termsCheck.checked;
     onboardSubmit.textContent = 'entrar ✦';
@@ -204,8 +218,37 @@ function paintUserUI() {
   setGradientBg(document.getElementById('miniAvatar'), me.gradient);
 }
 
-if (!me) openOnboarding();
-else paintUserUI();
+function listenMentions() {
+  if (!me) return;
+  if (_mentionsUnsub) { _mentionsUnsub(); _mentionsUnsub = null; }
+  const q = query(
+    collection(db, MENTIONS),
+    where('toUserId', '==', me.id),
+    orderBy('createdAt', 'desc'),
+    limit(20)
+  );
+  _mentionsUnsub = onSnapshot(q, snap => {
+    mentionsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    updateNotifications();
+  }, () => { });
+}
+
+const banScreen = document.getElementById('banScreen');
+
+function showBanScreen() {
+  banScreen.classList.remove('hidden');
+  onboardOverlay.classList.add('hidden');
+}
+
+if (!me) {
+  openOnboarding();
+} else {
+  paintUserUI();
+  listenMentions();
+  getDoc(doc(db, BANS, me.id)).then(snap => {
+    if (snap.exists()) showBanScreen();
+  }).catch(() => { });
+}
 
 // ── Admin auth ──
 onAuthStateChanged(auth, async (user) => {
@@ -238,14 +281,14 @@ onAuthStateChanged(auth, async (user) => {
     saveUser(me);
     onboardOverlay.classList.add('hidden');
     paintUserUI();
-    updateReplyCcomposersGradient();
+    listenMentions();
     try {
       await setDoc(doc(db, USERS, profile.name), {
         userId: profile.id,
         displayName: profile.name,
         createdAt: serverTimestamp()
       });
-    } catch {}
+    } catch { }
   } else if (!user && MOD_IDS.has(me?.id)) {
     // Restore previous regular user profile if one was saved before admin login
     const prevUser = localStorage.getItem(LS.PREV_USER);
@@ -272,7 +315,7 @@ function _handleAdminTap() {
   if (_adminTaps >= 5) {
     _adminTaps = 0;
     if (auth.currentUser) signOut(auth);
-    else signInWithPopup(auth, GOOGLE_PROVIDER).catch(() => {});
+    else signInWithPopup(auth, GOOGLE_PROVIDER).catch(() => { });
   }
 }
 document.querySelector('.brand').addEventListener('click', _handleAdminTap);
@@ -318,10 +361,25 @@ deleteDataBtn.addEventListener('click', async () => {
 });
 
 async function downloadMyPostsAsPDF() {
+  if (!me) {
+    showToast('crie um perfil para baixar posts');
+    return;
+  }
+
+  showToast('buscando seus posts…');
+
   const myPosts = [];
-  postsMap.forEach((data, id) => {
-    if (data.authorId === me?.id) myPosts.push({ id, ...data });
-  });
+  try {
+    const q = query(collection(db, POSTS), where('authorId', '==', me.id));
+    const snap = await getDocs(q);
+    snap.forEach(d => {
+      myPosts.push({ id: d.id, ...d.data() });
+    });
+  } catch (err) {
+    console.error('erro ao buscar posts para pdf:', err);
+    showToast('erro ao buscar seus posts');
+    return;
+  }
 
   if (myPosts.length === 0) {
     showToast('você ainda não tem posts');
@@ -338,12 +396,12 @@ async function downloadMyPostsAsPDF() {
   for (const post of myPosts) {
     const time = post.createdAt
       ? new Date(post.createdAt.seconds * 1000).toLocaleString('pt-BR', {
-          day: '2-digit', month: '2-digit', year: '2-digit',
-          hour: '2-digit', minute: '2-digit',
-        })
+        day: '2-digit', month: '2-digit', year: '2-digit',
+        hour: '2-digit', minute: '2-digit',
+      })
       : '';
     const [pg1, pg2] = post.gradient?.length === 2 ? post.gradient : [g1, g2];
-    const likes   = (post.likedBy || []).length;
+    const likes = (post.likedBy || []).length;
     const replies = post.replyCount || 0;
     const isDrawing = post.type === 'drawing';
 
@@ -391,17 +449,17 @@ async function downloadMyPostsAsPDF() {
     #pdf-export-container *,#pdf-export-container *::before,#pdf-export-container *::after{box-sizing:border-box;margin:0;padding:0}
     #pdf-export-container .xpage{padding:36px 24px 60px}
     #pdf-export-container .xbrand{display:flex;align-items:center;gap:14px;margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid rgba(255,255,255,.1)}
-    #pdf-export-container .xbrand-logo{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#ff2d78 0%,#9b59ff 100%);flex-shrink:0}
+    #pdf-export-container .xbrand-logo{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#ff2d78 0%,#9b59ff 100%);flex-shrink:0;overflow:hidden}
     #pdf-export-container .xbrand-w1{font-size:1.25rem;font-weight:800;letter-spacing:.1em;color:#ff2d78}
     #pdf-export-container .xbrand-w2{font-size:1.25rem;font-weight:300;letter-spacing:.18em;color:#9b59ff}
     #pdf-export-container .xbrand-sub{font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;color:rgba(240,230,255,.4);margin-top:3px}
     #pdf-export-container .xprofile-block{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:16px;margin-bottom:10px}
-    #pdf-export-container .xprofile-avatar{width:48px;height:48px;border-radius:50%;flex-shrink:0;border:2px solid rgba(255,255,255,.18)}
+    #pdf-export-container .xprofile-avatar{width:48px;height:48px;border-radius:50%;flex-shrink:0;overflow:hidden}
     #pdf-export-container .xprofile-name{font-size:1rem;font-weight:700}
     #pdf-export-container .xprofile-meta{font-size:.68rem;color:rgba(240,230,255,.45);margin-top:2px}
     #pdf-export-container .xpost-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:14px;margin-bottom:12px}
     #pdf-export-container .xpost-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-    #pdf-export-container .xpost-avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;border:1px solid rgba(255,255,255,.15)}
+    #pdf-export-container .xpost-avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;overflow:hidden}
     #pdf-export-container .xpost-author{font-size:.86rem;font-weight:700}
     #pdf-export-container .xpost-time{font-size:.64rem;color:rgba(240,230,255,.4);margin-top:1px}
     #pdf-export-container .xpost-content{font-size:.92rem;line-height:1.5;white-space:pre-wrap;word-break:break-word;color:#e8deff}
@@ -413,25 +471,23 @@ async function downloadMyPostsAsPDF() {
   document.head.appendChild(styleEl);
 
   const postsHTMLScoped = postsHTML
-    .replace(/class="post-card"/g,   'class="xpost-card"')
+    .replace(/class="post-card"/g, 'class="xpost-card"')
     .replace(/class="post-header"/g, 'class="xpost-header"')
     .replace(/class="post-avatar"/g, 'class="xpost-avatar"')
     .replace(/class="post-author"/g, 'class="xpost-author"')
-    .replace(/class="post-time"/g,   'class="xpost-time"')
-    .replace(/class="post-content"/g,'class="xpost-content"')
-    .replace(/class="post-drawing"/g,'class="xpost-drawing"')
+    .replace(/class="post-time"/g, 'class="xpost-time"')
+    .replace(/class="post-content"/g, 'class="xpost-content"')
+    .replace(/class="post-drawing"/g, 'class="xpost-drawing"')
     .replace(/class="post-footer"/g, 'class="xpost-footer"')
-    .replace(/class="post-stat"/g,   'class="xpost-stat"');
+    .replace(/class="post-stat"/g, 'class="xpost-stat"');
 
   const container = document.createElement('div');
   container.id = 'pdf-export-container';
   container.innerHTML = `
     <div class="xpage">
       <div class="xbrand">
-        <div class="xbrand-logo"></div>
         <div>
           <div><span class="xbrand-w1">WEVERSE </span><span class="xbrand-w2">HANGOVER</span></div>
-          <div class="xbrand-sub">relatório de dados pessoais</div>
         </div>
       </div>
       <div class="xprofile-block">
@@ -451,13 +507,23 @@ async function downloadMyPostsAsPDF() {
   document.body.appendChild(container);
 
   try {
-    const canvas = await html2canvas(container.querySelector('.xpage'), {
+    const targetEl = container.querySelector('.xpage');
+    const canvas = await html2canvas(targetEl, {
       scale: 2, useCORS: true, backgroundColor: '#1a0a2e', logging: false,
+      windowWidth: 580, windowHeight: targetEl.scrollHeight
     });
     const W = canvas.width / 2, H = canvas.height / 2;
-    const pdf = new window.jspdf.jsPDF({ orientation: 'p', unit: 'px', format: [W, H] });
+    const pdf = new window.jspdf.jsPDF({ orientation: W > H ? 'l' : 'p', unit: 'px', format: [W, H] });
     pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, W, H);
-    pdf.save('meus-posts-hangul-hangover.pdf');
+    const blob = pdf.output('blob');
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'meus-posts-hangul-hangover.pdf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
     showToast('PDF baixado!');
   } catch {
     showToast('erro ao gerar PDF. use Ctrl+P → Salvar como PDF');
@@ -488,7 +554,7 @@ async function deleteUserData() {
       ...postsSnap.docs.map(d => deleteDoc(d.ref)),
       ...repliesSnap.docs.map(d => deleteDoc(d.ref)),
     ]);
-    try { await deleteDoc(doc(db, USERS, me.name.toLowerCase())); } catch {}
+    try { await deleteDoc(doc(db, USERS, me.name.toLowerCase())); } catch { }
     Object.values(LS).forEach(k => localStorage.removeItem(k));
     showToast('dados deletados!');
     setTimeout(() => location.reload(), 1500);
@@ -517,16 +583,19 @@ const colorPreview = document.getElementById('colorPreview');
 const drawControls = document.getElementById('drawControls');
 const eraserBtn = document.getElementById('eraserBtn');
 const rainbowBtn = document.getElementById('rainbowBtn');
+const brushSizeSlider = document.getElementById('brushSize');
+
 
 const CANVAS_W = 600;
 const CANVAS_H = 800;
 
 let inputMode = 'text';
 let brushColor = '#ff2d78';
-const brushRadius = 5;
+let brushRadius = 5;
 let isDrawing = false;
 let lastX = 0, lastY = 0;
 let isRainbow = false;
+let isEraser = false;
 let rainbowHue = 0;
 
 const ctx = drawCanvas.getContext('2d');
@@ -537,13 +606,13 @@ ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
 // SVG icons
 const SVG_BRUSH = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z"/><path d="M9 8c-2 3-4 3.5-7 4l8 10c2-1 6-5 6-7"/><path d="M14.5 17.5 4.5 15"/></svg>`;
-const SVG_TEXT = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>`;
+const SVG_CLOSE = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
 
 function updateToggleIcon() {
   if (inputMode === 'text') {
     toggleIconWrap.innerHTML = SVG_BRUSH;
   } else {
-    toggleIconWrap.innerHTML = SVG_TEXT;
+    toggleIconWrap.innerHTML = SVG_CLOSE;
   }
 }
 updateToggleIcon();
@@ -558,6 +627,7 @@ function getCanvasPos(e) {
 }
 
 function currentColor() {
+  if (isEraser) return '#ffffff';
   if (isRainbow) {
     rainbowHue = (rainbowHue + 4) % 360;
     return `hsl(${rainbowHue}, 100%, 50%)`;
@@ -608,25 +678,30 @@ brushColorInput.addEventListener('input', (e) => {
   brushColor = e.target.value;
   colorPreview.style.background = brushColor;
   deactivateRainbow();
+  isEraser = false;
   eraserBtn.classList.remove('eraser-active');
 });
 
 eraserBtn.addEventListener('click', () => {
-  brushColor = '#ffffff';
-  colorPreview.style.background = '#ffffff';
-  deactivateRainbow();
-  eraserBtn.classList.toggle('eraser-active');
+  isEraser = !isEraser;
+  eraserBtn.classList.toggle('eraser-active', isEraser);
+  if (isEraser) deactivateRainbow();
 });
 
 rainbowBtn.addEventListener('click', () => {
   isRainbow = !isRainbow;
   rainbowBtn.classList.toggle('rainbow-active', isRainbow);
-  eraserBtn.classList.remove('eraser-active');
   if (isRainbow) {
-    brushColor = '#ff2d78';
-    colorPreview.style.background = brushColor;
+    isEraser = false;
+    eraserBtn.classList.remove('eraser-active');
   }
 });
+
+brushSizeSlider.addEventListener('input', () => {
+  brushRadius = Number(brushSizeSlider.value);
+});
+
+
 
 toggleDraw.addEventListener('click', () => {
   if (inputMode === 'text') {
@@ -645,7 +720,9 @@ toggleDraw.addEventListener('click', () => {
     charCountWrapper.classList.remove('hidden');
     drawControls.classList.add('hidden');
     deactivateRainbow();
+    isEraser = false;
     eraserBtn.classList.remove('eraser-active');
+
     messageField.focus();
   }
   updateToggleIcon();
@@ -739,16 +816,19 @@ async function handleSubmit() {
       authorId: me.id,
       gradient: me.gradient,
       likedBy: [],
+      likeCount: 0,
       replyCount: 0,
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
     };
-    await addDoc(collection(db, POSTS), docData);
+    const postRef = await addDoc(collection(db, POSTS), docData);
+    if (inputMode === 'text') writeMentions(message, postRef.id, 'post');
 
     messageField.value = '';
     messageField.style.height = 'auto';
     charCount.textContent = '0';
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
 
     if (inputMode === 'draw') toggleDraw.click();
 
@@ -769,43 +849,53 @@ async function handleSubmit() {
 // ═══════════════════════════════════════════
 const feed = document.getElementById('feed');
 const emptyFeed = document.getElementById('emptyFeed');
+const feedLoading = document.getElementById('feedLoading');
 
 let activeTab = 'all';
+let searchQuery = '';
+let searchResultsMap = new Map();
+let _searchLoading = false;
 
 function getPostsForTab(tab) {
   const all = [];
   for (const [id, data] of postsMap.entries()) {
     const _rc = data.reportedBy?.length || 0;
     const _mc = data.maintainedCount || 0;
-    if (_rc >= 3 && _rc > _mc) continue;
+    if (_rc >= 7 && _rc > _mc) continue;
     all.push([id, data]);
   }
   const cmp = (a, b) => (b[1].createdAt?.seconds || 0) - (a[1].createdAt?.seconds || 0);
   switch (tab) {
-    case 'texts':    return all.filter(([, d]) => d.type !== 'drawing').sort(cmp);
+    case 'texts': return all.filter(([, d]) => d.type !== 'drawing').sort(cmp);
     case 'drawings': return all.filter(([, d]) => d.type === 'drawing').sort(cmp);
-    case 'top':      return all.slice().sort((a, b) => (b[1].likedBy?.length || 0) - (a[1].likedBy?.length || 0)).slice(0, 10);
-    case 'mods':     return all.filter(([, d]) => MOD_NAMES.has(d.author)).sort(cmp);
-    default:         return all.sort(cmp);
+    case 'mods': return all.filter(([, d]) => MOD_NAMES.has(d.author)).sort(cmp);
+    default: return all.sort(cmp);
   }
 }
 
+let _tabCountsCache = '';
 function updateTabCounts() {
   const all = [];
   for (const [, data] of postsMap.entries()) {
     const _rc = data.reportedBy?.length || 0;
     const _mc = data.maintainedCount || 0;
-    if (_rc >= 3 && _rc > _mc) continue;
+    if (_rc >= 7 && _rc > _mc) continue;
     all.push(data);
   }
-  const cntAll      = document.getElementById('cnt-all');
-  const cntTexts    = document.getElementById('cnt-texts');
+  const texts = all.filter(d => d.type !== 'drawing').length;
+  const drawings = all.filter(d => d.type === 'drawing').length;
+  const mods = all.filter(d => MOD_NAMES.has(d.author)).length;
+  const key = `${all.length}|${texts}|${drawings}|${mods}`;
+  if (key === _tabCountsCache) return;
+  _tabCountsCache = key;
+  const cntAll = document.getElementById('cnt-all');
+  const cntTexts = document.getElementById('cnt-texts');
   const cntDrawings = document.getElementById('cnt-drawings');
-  const cntMods     = document.getElementById('cnt-mods');
-  if (cntAll)      cntAll.textContent      = all.length;
-  if (cntTexts)    cntTexts.textContent    = all.filter(d => d.type !== 'drawing').length;
-  if (cntDrawings) cntDrawings.textContent = all.filter(d => d.type === 'drawing').length;
-  if (cntMods)     cntMods.textContent     = all.filter(d => MOD_NAMES.has(d.author)).length;
+  const cntMods = document.getElementById('cnt-mods');
+  if (cntAll) cntAll.textContent = all.length;
+  if (cntTexts) cntTexts.textContent = texts;
+  if (cntDrawings) cntDrawings.textContent = drawings;
+  if (cntMods) cntMods.textContent = mods;
 }
 
 // ── Feed Tabs ──
@@ -813,7 +903,7 @@ const feedTabs = document.getElementById('feedTabs');
 
 function moveIndicator(btn) {
   if (!btn || !feedTabs) return;
-  const rect     = btn.getBoundingClientRect();
+  const rect = btn.getBoundingClientRect();
   const hostRect = feedTabs.getBoundingClientRect();
   feedTabs.style.setProperty('--ind-x', (rect.left - hostRect.left + feedTabs.scrollLeft) + 'px');
   feedTabs.style.setProperty('--ind-w', rect.width + 'px');
@@ -832,9 +922,13 @@ feedTabs.addEventListener('click', e => {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
+let _resizeTimer;
 window.addEventListener('resize', () => {
-  const active = document.querySelector('.feed-tab.active');
-  if (active) moveIndicator(active);
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(() => {
+    const active = document.querySelector('.feed-tab.active');
+    if (active) moveIndicator(active);
+  }, 150);
 });
 
 requestAnimationFrame(() => {
@@ -844,6 +938,16 @@ requestAnimationFrame(() => {
 
 const cardElements = new Map();
 const replySubs = new Map();
+const visibleCards = new Set();
+
+const visibilityObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    const id = entry.target.dataset.id;
+    if (!id) return;
+    if (entry.isIntersecting) visibleCards.add(id);
+    else visibleCards.delete(id);
+  });
+}, { threshold: 0.01 });
 
 // IntersectionObserver: mark as "seen" after 1.5s in view
 const seenObserver = new IntersectionObserver((entries) => {
@@ -895,55 +999,19 @@ function buildPostElement(id, data) {
   });
   seenObserver.observe(el);
   replySubObserver.observe(el);
+  visibilityObserver.observe(el);
   return el;
 }
 
 function buildDrawingTile(id, data) {
-  const liked = (data.likedBy || []).includes(me?.id);
-  const likeCount = (data.likedBy || []).length;
   const el = document.createElement('div');
   el.className = 'drawing-tile';
   el.dataset.id = id;
-  el.innerHTML = `
-    <img class="post-drawing tile-img" src="${data.message || ''}" alt="desenho" loading="lazy" />
-    <div class="tile-overlay">
-      <button class="tile-like-btn${liked ? ' liked' : ''}" type="button">
-        <svg width="14" height="14" viewBox="0 0 24 24"
-          fill="${liked ? 'currentColor' : 'none'}"
-          stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-        </svg>
-        ${likeCount > 0 ? `<span class="tile-like-count">${likeCount}</span>` : ''}
-      </button>
-    </div>
-  `;
-  el.querySelector('.tile-like-btn').addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleLike(id, postsMap.get(id) || data);
-  });
+  const tileSrc = typeof data.message === 'string' && /^data:image\/(png|jpeg|gif|webp);base64,/.test(data.message) ? data.message : '';
+  el.innerHTML = `<img class="post-drawing tile-img" src="${tileSrc}" alt="desenho" loading="lazy" />`;
   seenObserver.observe(el);
+  visibilityObserver.observe(el);
   return el;
-}
-
-function updateDrawingTile(el, data) {
-  const liked = (data.likedBy || []).includes(me?.id);
-  const likeCount = (data.likedBy || []).length;
-  const btn = el.querySelector('.tile-like-btn');
-  if (!btn) return;
-  btn.classList.toggle('liked', liked);
-  btn.querySelector('svg').setAttribute('fill', liked ? 'currentColor' : 'none');
-  let countEl = btn.querySelector('.tile-like-count');
-  if (likeCount > 0) {
-    if (!countEl) {
-      countEl = document.createElement('span');
-      countEl.className = 'tile-like-count';
-      btn.appendChild(countEl);
-    }
-    countEl.textContent = likeCount;
-  } else {
-    countEl?.remove();
-  }
 }
 
 async function selfDeletePost(id, el) {
@@ -984,22 +1052,27 @@ function updatePostElement(el, id, data) {
 
 async function toggleLike(id, data) {
   if (!me) return openOnboarding();
-  const liked = (data.likedBy || []).includes(me.id);
-  if (data.authorId === me.id && !liked) {
-    showConfirmToast('Alguém te ama mais que você?', () => _doLike(id, data, liked), null);
+  const current = postsMap.get(id) || data;
+  const liked = (current.likedBy || []).includes(me.id);
+  if (current.authorId === me.id && !liked) {
+    showConfirmToast('Alguém te ama mais do que você mesmo?', () => { }, () => _doLike(id, current, liked));
     return;
   }
-  await _doLike(id, data, liked);
+  await _doLike(id, current, liked);
 }
 
 async function _doLike(id, data, liked) {
   const ref = doc(db, POSTS, id);
   try {
-    const updates = { likedBy: liked ? arrayRemove(me.id) : arrayUnion(me.id) };
+    const updates = {
+      likedBy: liked ? arrayRemove(me.id) : arrayUnion(me.id),
+      likeCount: increment(liked ? -1 : 1)
+    };
     if (!liked && data.authorId !== me.id) {
       updates.lastLikerName = me.name;
       updates.lastLikerGradient = me.gradient;
       updates.lastLikerId = me.id;
+      updates.lastLikedAt = serverTimestamp();
     }
     await updateDoc(ref, updates);
   } catch (err) {
@@ -1020,7 +1093,7 @@ function initReplySection(id, postEl) {
   section.innerHTML = `
     <div class="reply-thread" id="thread_${id}"></div>
     <div class="reply-composer">
-      <input class="reply-input" type="text" placeholder="responder..." maxlength="200" autocomplete="off" />
+      <input class="reply-input" type="text" placeholder="responder..." maxlength="200" autocomplete="off" autocorrect="on" autocapitalize="sentences" />
       <button class="reply-send" type="button" disabled>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
           stroke-linecap="round" stroke-linejoin="round">
@@ -1059,8 +1132,12 @@ function initReplySection(id, postEl) {
       await updateDoc(doc(db, POSTS, id), {
         replyCount: increment(1),
         lastReplyAuthor: me.name,
-        lastReplyText: txt.slice(0, 100)
+        lastReplyText: txt.slice(0, 100),
+        lastReplyGradient: me.gradient,
+        lastRepliedAt: serverTimestamp(),
+        replyUniqueAuthors: arrayUnion(me.id),
       });
+      writeMentions(txt, id, 'reply');
       input.value = '';
     } catch (err) {
       console.error('reply error', err);
@@ -1083,13 +1160,41 @@ function initReplySection(id, postEl) {
   replySubs.set(id, unsub);
 }
 
+async function writeMentions(txt, postId, context = 'reply') {
+  if (!me || !txt) return;
+  const names = [...new Set(
+    [...txt.matchAll(/@([a-zA-Z0-9._]{1,40})/g)].map(m => m[1])
+  )].filter(n => n.toLowerCase() !== me.name.toLowerCase());
+  if (!names.length) return;
+  for (const mentionedName of names) {
+    try {
+      const userSnap = await getDoc(doc(db, USERS, mentionedName.toLowerCase()));
+      if (!userSnap.exists()) continue;
+      const ud = userSnap.data();
+      await addDoc(collection(db, MENTIONS), {
+        toUserId: ud.userId,
+        toName: ud.displayName || mentionedName,
+        fromName: me.name,
+        fromId: me.id,
+        fromGradient: me.gradient,
+        postId,
+        replyText: txt.slice(0, 100),
+        context,
+        createdAt: serverTimestamp(),
+      });
+    } catch { }
+  }
+}
+
 function renderReplyThread(id, snap) {
   const thread = document.getElementById(`thread_${id}`);
   if (!thread) return;
   thread.innerHTML = '';
-  snap.forEach(d => {
-    const r = d.data();
-    const replyId = d.id;
+
+  const replies = [];
+  snap.forEach(d => replies.push({ replyId: d.id, ...d.data() }));
+
+  function buildReplyItem(r) {
     const grad = r.gradient?.length === 2 ? gradientCSS(r.gradient) : gradientCSS(['#ff2d78', '#9b59ff']);
     const isMine = r.authorId === me?.id;
     const reported = (r.reportedBy || []).includes(me?.id);
@@ -1105,7 +1210,7 @@ function renderReplyThread(id, snap) {
           ${MOD_NAMES.has(r.author) ? '<span class="mod-star mod-star-sm">★</span>' : ''}
           <span class="reply-time">${formatTime(r.createdAt)}</span>
         </div>
-        <div class="reply-content">${escapeHTML(r.message)}</div>
+        <div class="reply-content">${highlightMentions(escapeHTML(r.message))}</div>
         <div class="reply-actions">
           <button class="reply-like-btn ${liked ? 'liked' : ''}" type="button">
             <svg width="13" height="13" viewBox="0 0 24 24"
@@ -1115,6 +1220,13 @@ function renderReplyThread(id, snap) {
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
             </svg>
             ${likeCount > 0 ? `<span>${likeCount}</span>` : ''}
+          </button>
+          <button class="reply-reply-btn" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 17 4 12 9 7"/>
+              <path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
+            </svg>
+            responder
           </button>
         </div>
       </div>
@@ -1133,10 +1245,41 @@ function renderReplyThread(id, snap) {
       </div>
     `;
 
-    item.querySelector('.reply-like-btn').addEventListener('click', () => toggleReplyLike(id, replyId, r));
+    item.querySelector('.reply-like-btn').addEventListener('click', () => toggleReplyLike(id, r.replyId, r));
+
+    item.querySelector('.reply-reply-btn').addEventListener('click', () => {
+      const mention = `@${r.author} `;
+      const postEl = document.querySelector(`.post[data-id="${id}"]`);
+      if (!postEl) return;
+      const section = postEl.querySelector('.replies-section');
+      const input = section?.querySelector('.reply-input');
+      if (input) {
+        const composer = section.querySelector('.reply-composer');
+        input.value = mention;
+        input.dispatchEvent(new Event('input'));
+        composer?.classList.add('open');
+        input.focus();
+        input.setSelectionRange(mention.length, mention.length);
+        composer?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } else {
+        initReplySection(id, postEl);
+        requestAnimationFrame(() => {
+          const newInput = postEl.querySelector('.reply-input');
+          const newComposer = postEl.querySelector('.reply-composer');
+          if (newInput) {
+            newInput.value = mention;
+            newInput.dispatchEvent(new Event('input'));
+            newComposer?.classList.add('open');
+            newInput.focus();
+            newInput.setSelectionRange(mention.length, mention.length);
+            newComposer?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        });
+      }
+    });
 
     const menuBtn = item.querySelector('.post-menu-btn');
-    const menuEl  = item.querySelector('.post-menu');
+    const menuEl = item.querySelector('.post-menu');
     menuBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       const isOpen = menuEl.classList.contains('open');
@@ -1147,23 +1290,47 @@ function renderReplyThread(id, snap) {
     if (isMine) {
       item.querySelector('.reply-selfdelete-btn')?.addEventListener('click', () => {
         menuEl.classList.remove('open');
-        selfDeleteReply(id, replyId, item);
+        selfDeleteReply(id, r.replyId, item);
       });
     } else {
       item.querySelector('.reply-report-btn')?.addEventListener('click', () => {
         menuEl.classList.remove('open');
-        reportReply(id, replyId, r);
+        reportReply(id, r.replyId, r);
       });
     }
 
-    thread.appendChild(item);
-  });
+    return item;
+  }
+
+  const MAX_VISIBLE = 5;
+  const visible = replies.slice(0, MAX_VISIBLE);
+  visible.forEach(r => thread.appendChild(buildReplyItem(r)));
+
+  if (replies.length > MAX_VISIBLE) {
+    const remaining = replies.slice(MAX_VISIBLE);
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'replies-toggle-btn';
+    toggleBtn.textContent = `Ver mais (${remaining.length})`;
+    toggleBtn.addEventListener('click', () => {
+      toggleBtn.remove();
+      remaining.forEach(r => thread.appendChild(buildReplyItem(r)));
+    });
+    thread.appendChild(toggleBtn);
+  }
 }
 
 async function toggleReplyLike(postId, replyId, data) {
   if (!me) return openOnboarding();
-  const ref = doc(db, POSTS, postId, 'replies', replyId);
   const liked = (data.likedBy || []).includes(me.id);
+  if (data.authorId === me.id && !liked) {
+    showConfirmToast('Alguém te ama mais do que você mesmo?', () => { }, () => _doReplyLike(postId, replyId, data, liked));
+    return;
+  }
+  await _doReplyLike(postId, replyId, data, liked);
+}
+
+async function _doReplyLike(postId, replyId, data, liked) {
+  const ref = doc(db, POSTS, postId, 'replies', replyId);
   try {
     await updateDoc(ref, { likedBy: liked ? arrayRemove(me.id) : arrayUnion(me.id) });
   } catch (err) {
@@ -1199,13 +1366,6 @@ async function reportReply(postId, replyId, replyData) {
   }
 }
 
-function updateReplyCcomposersGradient() {
-  if (!me) return;
-  document.querySelectorAll('.reply-avatar').forEach(el => {
-    setGradientBg(el, me.gradient);
-  });
-}
-
 // ═══════════════════════════════════════════
 // MAIN POSTS LISTENER (with pending buffer)
 // ═══════════════════════════════════════════
@@ -1217,22 +1377,60 @@ let isFetchingMore = false;
 
 const postsMap = new Map();
 const pendingNewPosts = new Map();
+const scheduledPosts = new Map();
 let initialLoadDone = false;
+let _lightboxPostId = null;
+
+setInterval(() => {
+  const now = Date.now();
+  let changed = false;
+  let hasNewFromOthers = false;
+  scheduledPosts.forEach((data, id) => {
+    if (data.createdAt && data.createdAt.toMillis() <= now) {
+      scheduledPosts.delete(id);
+      if (data.authorId === me?.id) {
+        postsMap.set(id, data);
+        changed = true;
+      } else {
+        pendingNewPosts.set(id, data);
+        hasNewFromOthers = true;
+      }
+    }
+  });
+  if (hasNewFromOthers) showUpdateButton();
+  if (changed) {
+    renderFeed();
+    updateNotifications();
+  }
+}, 10000);
 
 const postsQ = query(collection(db, POSTS), orderBy('createdAt', 'desc'), limit(50));
 
 onSnapshot(postsQ, (snapshot) => {
   if (snapshot.empty) {
+    feedLoading.classList.add('hidden');
+    feed.classList.remove('hidden');
     feed.innerHTML = '';
     emptyFeed.classList.remove('hidden');
     return;
   }
   emptyFeed.classList.add('hidden');
 
+  const now = Date.now();
+
   if (!initialLoadDone) {
-    snapshot.forEach(d => postsMap.set(d.id, d.data()));
+    snapshot.forEach(d => {
+      const data = d.data();
+      if (data.createdAt && data.createdAt.toMillis() > now) {
+        scheduledPosts.set(d.id, data);
+      } else {
+        postsMap.set(d.id, data);
+      }
+    });
     lastVisible = snapshot.docs[snapshot.docs.length - 1] ?? null;
     initialLoadDone = true;
+    feedLoading.classList.add('hidden');
+    feed.classList.remove('hidden');
     renderFeed();
     updateNotifications();
     return;
@@ -1243,22 +1441,48 @@ onSnapshot(postsQ, (snapshot) => {
   snapshot.docChanges().forEach(change => {
     const id = change.doc.id;
     const data = change.doc.data();
+    const isFuture = data.createdAt && data.createdAt.toMillis() > Date.now();
 
     if (change.type === 'added') {
-      if (data.authorId === me?.id) {
-        // Own post: show immediately
-        postsMap.set(id, data);
+      if (isFuture) {
+        scheduledPosts.set(id, data);
       } else {
-        // Other user's post: buffer
-        pendingNewPosts.set(id, data);
-        hasNewFromOthers = true;
+        if (data.authorId === me?.id) {
+          // Own post: show immediately
+          postsMap.set(id, data);
+        } else {
+          // Other user's post: buffer
+          pendingNewPosts.set(id, data);
+          hasNewFromOthers = true;
+        }
       }
     } else if (change.type === 'modified') {
-      if (postsMap.has(id)) postsMap.set(id, data);
-      if (pendingNewPosts.has(id)) pendingNewPosts.set(id, data);
+      if (isFuture) {
+        scheduledPosts.set(id, data);
+        if (postsMap.has(id)) postsMap.delete(id);
+        if (pendingNewPosts.has(id)) pendingNewPosts.delete(id);
+      } else {
+        if (scheduledPosts.has(id)) {
+          scheduledPosts.delete(id);
+          if (data.authorId === me?.id) {
+            postsMap.set(id, data);
+          } else {
+            pendingNewPosts.set(id, data);
+            hasNewFromOthers = true;
+          }
+        } else {
+          if (postsMap.has(id)) postsMap.set(id, data);
+          if (pendingNewPosts.has(id)) pendingNewPosts.set(id, data);
+        }
+      }
+      if (id === _lightboxPostId) {
+        const actionsEl = document.querySelector('.lightbox-actions');
+        if (actionsEl) renderLightboxActions(actionsEl, id, data);
+      }
     } else if (change.type === 'removed') {
       postsMap.delete(id);
       pendingNewPosts.delete(id);
+      scheduledPosts.delete(id);
     }
   });
 
@@ -1290,32 +1514,300 @@ updateFeedBtn.addEventListener('click', () => {
   renderFeed();
 });
 
+function cleanupTrendingSections() {
+  feed.querySelectorAll('.trending-section [data-id]').forEach(el => {
+    seenObserver.unobserve(el);
+    replySubObserver.unobserve(el);
+    visibilityObserver.unobserve(el);
+    const id = el.dataset.id;
+    visibleCards.delete(id);
+    if (replySubs.has(id)) { replySubs.get(id)(); replySubs.delete(id); }
+    cardElements.delete(id);
+  });
+  feed.querySelectorAll('.rank-strip, .trending-section').forEach(el => el.remove());
+}
+
+const topLikedQ = query(collection(db, POSTS), orderBy('likeCount', 'desc'), limit(15));
+const topCommentedQ = query(collection(db, POSTS), orderBy('replyCount', 'desc'), limit(15));
+
+let topLikedPostsData = new Map();
+let topCommentedPostsData = new Map();
+
+onSnapshot(topLikedQ, (snap) => {
+  const newMap = new Map();
+  snap.forEach(d => {
+    const data = d.data();
+    const _rc = data.reportedBy?.length || 0;
+    const _mc = data.maintainedCount || 0;
+    if (!(_rc >= 7 && _rc > _mc) && (data.likeCount || 0) > 0) {
+      newMap.set(d.id, data);
+    }
+  });
+  topLikedPostsData = newMap;
+  if (activeTab === 'top') renderTrending();
+});
+
+onSnapshot(topCommentedQ, (snap) => {
+  const newMap = new Map();
+  snap.forEach(d => {
+    const data = d.data();
+    const _rc = data.reportedBy?.length || 0;
+    const _mc = data.maintainedCount || 0;
+    if (!(_rc >= 7 && _rc > _mc) && (data.replyCount || 0) > 0) {
+      newMap.set(d.id, data);
+    }
+  });
+  topCommentedPostsData = newMap;
+  if (activeTab === 'top') renderTrending();
+});
+
+function renderTrending() {
+  updateTabCounts();
+  feed.classList.remove('feed-gallery');
+  feed.querySelectorAll('[data-id]').forEach(el => {
+    if (el.closest('.trending-section')) return;
+    const id = el.dataset.id;
+    seenObserver.unobserve(el);
+    replySubObserver.unobserve(el);
+    visibilityObserver.unobserve(el);
+    visibleCards.delete(id);
+    if (replySubs.has(id)) { replySubs.get(id)(); replySubs.delete(id); }
+    cardElements.delete(id);
+    el.remove();
+  });
+  feed.querySelector('.tab-empty')?.remove();
+  loadSentinel.remove();
+
+  const likedPosts = Array.from(topLikedPostsData.entries()).sort((a, b) => (b[1].likeCount || 0) - (a[1].likeCount || 0)).slice(0, 10);
+  const commentedPosts = Array.from(topCommentedPostsData.entries()).sort((a, b) => (b[1].replyCount || 0) - (a[1].replyCount || 0)).slice(0, 10);
+
+  // ── Liked section ──────────────────────────────────────────
+  let likedStrip = feed.querySelector('.rank-strip--liked');
+  let likedSection = feed.querySelector('.trending-section--liked');
+  if (!likedStrip) {
+    likedStrip = document.createElement('div');
+    likedStrip.className = 'rank-strip rank-strip--liked';
+    likedStrip.textContent = 'posts mais curtidos da noite';
+    feed.insertBefore(likedStrip, feed.firstChild);
+  }
+  if (!likedSection) {
+    likedSection = document.createElement('div');
+    likedSection.className = 'trending-section trending-section--liked';
+    likedStrip.after(likedSection);
+  }
+  likedStrip.hidden = likedPosts.length === 0;
+  renderInto(likedSection, likedPosts);
+  likedSection.querySelectorAll('.post[data-id]').forEach((el, i) => {
+    el.classList.add('post-rank');
+    el.dataset.rank = '#' + (i + 1);
+  });
+
+  // ── Commented section ──────────────────────────────────────
+  let commentedStrip = feed.querySelector('.rank-strip--commented');
+  let commentedSection = feed.querySelector('.trending-section--commented');
+  if (!commentedStrip) {
+    commentedStrip = document.createElement('div');
+    commentedStrip.className = 'rank-strip rank-strip--commented';
+    commentedStrip.textContent = 'posts mais comentados da noite';
+    likedSection.after(commentedStrip);
+  }
+  if (!commentedSection) {
+    commentedSection = document.createElement('div');
+    commentedSection.className = 'trending-section trending-section--commented';
+    commentedStrip.after(commentedSection);
+  }
+  commentedStrip.hidden = commentedPosts.length === 0;
+  renderInto(commentedSection, commentedPosts);
+  commentedSection.querySelectorAll('.post[data-id]').forEach((el, i) => {
+    el.classList.add('post-rank');
+    el.dataset.rank = '#' + (i + 1);
+  });
+
+  // ── Empty state ────────────────────────────────────────────
+  if (likedPosts.length === 0 && commentedPosts.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'tab-empty';
+    empty.innerHTML = '<span class="icon">✦</span><p>nada por aqui ainda.</p>';
+    feed.appendChild(empty);
+  }
+}
+
+// ═══════════════════════════════════════════
+// SEARCH
+// ═══════════════════════════════════════════
+const searchBtn = document.getElementById('searchBtn');
+const feedSearchBar = document.getElementById('feedSearchBar');
+const feedSearchInput = document.getElementById('feedSearchInput');
+const feedSearchClose = document.getElementById('feedSearchClose');
+
+function openSearch() {
+  feedSearchBar.classList.remove('hidden');
+  feedSearchInput.focus();
+  feedTabs.classList.add('hidden');
+  loadSentinel.remove();
+}
+
+function closeSearch() {
+  feedSearchBar.classList.add('hidden');
+  feedSearchInput.value = '';
+  feedTabs.classList.remove('hidden');
+  document.querySelector('.search-results-info')?.remove();
+  searchQuery = '';
+  searchResultsMap.clear();
+  // Tear down observers and subscriptions for search-result cards before clearing DOM
+  feed.querySelectorAll('[data-id]').forEach(el => {
+    const id = el.dataset.id;
+    seenObserver.unobserve(el);
+    replySubObserver.unobserve(el);
+    visibilityObserver.unobserve(el);
+    visibleCards.delete(id);
+    if (replySubs.has(id)) { replySubs.get(id)(); replySubs.delete(id); }
+  });
+  cardElements.clear();
+  feed.innerHTML = '';
+  renderFeed();
+}
+
+searchBtn.addEventListener('click', openSearch);
+feedSearchClose.addEventListener('click', closeSearch);
+
+let _searchTimer;
+feedSearchInput.addEventListener('input', () => {
+  clearTimeout(_searchTimer);
+  const q = feedSearchInput.value.trim();
+  if (!q) {
+    searchQuery = '';
+    searchResultsMap.clear();
+    renderFeed();
+    return;
+  }
+  _searchTimer = setTimeout(() => performSearch(q), 350);
+});
+
+async function performSearch(q) {
+  if (_searchLoading) return;
+  const term = q.toLowerCase();
+  _searchLoading = true;
+  searchQuery = term;
+
+  // Tear down any cards rendered by a previous search before replacing the DOM
+  feed.querySelectorAll('[data-id]').forEach(el => {
+    const id = el.dataset.id;
+    seenObserver.unobserve(el);
+    replySubObserver.unobserve(el);
+    visibilityObserver.unobserve(el);
+    visibleCards.delete(id);
+    if (replySubs.has(id)) { replySubs.get(id)(); replySubs.delete(id); }
+    cardElements.delete(id);
+  });
+
+  cleanupTrendingSections();
+  feed.classList.remove('feed-gallery');
+  feed.classList.add('feed-list');
+  feed.innerHTML = `<div class="search-loading"><svg class="spinner" width="28" height="28" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="rgba(255,45,120,0.25)" stroke-width="2.5" fill="none"/><path d="M12 2a10 10 0 0 1 10 10" stroke="#ff2d78" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg></div>`;
+
+  try {
+    const matchingIds = new Set();
+    const tempMap = new Map();
+
+    const postsSnap = await getDocs(query(collection(db, POSTS), orderBy('createdAt', 'desc'), limit(500)));
+    postsSnap.forEach(d => {
+      const data = d.data();
+      tempMap.set(d.id, data);
+      if (
+        (data.author || '').toLowerCase().includes(term) ||
+        (data.message || '').toLowerCase().includes(term) ||
+        (data.caption || '').toLowerCase().includes(term)
+      ) matchingIds.add(d.id);
+    });
+
+    const repliesSnap = await getDocs(query(collectionGroup(db, 'replies'), limit(1000)));
+    repliesSnap.forEach(d => {
+      const data = d.data();
+      if (
+        (data.author || '').toLowerCase().includes(term) ||
+        (data.message || '').toLowerCase().includes(term)
+      ) {
+        const postId = d.ref.parent.parent.id;
+        matchingIds.add(postId);
+      }
+    });
+
+    searchResultsMap.clear();
+    for (const id of matchingIds) {
+      const data = tempMap.get(id);
+      if (data) searchResultsMap.set(id, data);
+    }
+  } catch (err) {
+    console.error('search error', err);
+  } finally {
+    _searchLoading = false;
+  }
+
+  if (searchQuery === term) renderFeed();
+}
+
+function renderSearchResults() {
+  feed.querySelector('.search-loading')?.remove();
+  cleanupTrendingSections();
+  feed.classList.remove('feed-gallery');
+  feed.classList.add('feed-list');
+
+  const cmp = (a, b) => (b[1].createdAt?.seconds || 0) - (a[1].createdAt?.seconds || 0);
+  const results = [...searchResultsMap.entries()].sort(cmp);
+
+  let infoEl = feed.previousElementSibling;
+  if (!infoEl?.classList.contains('search-results-info')) {
+    infoEl = document.createElement('div');
+    infoEl.className = 'search-results-info';
+    feed.parentNode.insertBefore(infoEl, feed);
+  }
+  infoEl.textContent = results.length === 0
+    ? 'nenhum resultado encontrado.'
+    : `${results.length} resultado${results.length !== 1 ? 's' : ''} para "${feedSearchInput.value.trim()}"`;
+
+  if (results.length === 0) {
+    feed.querySelectorAll('[data-id]').forEach(el => el.remove());
+    return;
+  }
+
+  renderInto(feed, results);
+  loadSentinel.remove();
+}
+
 function renderFeed() {
-  const allPosts = getPostsForTab(activeTab);
-  const posts = allPosts.slice(0, renderedCount);
   updateTabCounts();
 
-  // Rank strip (only for Trending)
-  let rankStrip = feed.querySelector('.rank-strip');
-  if (activeTab === 'top') {
-    if (!rankStrip) {
-      rankStrip = document.createElement('div');
-      rankStrip.className = 'rank-strip';
-      rankStrip.textContent = 'posts mais curtidos da noite';
-      feed.insertBefore(rankStrip, feed.firstChild);
-    }
-  } else {
-    rankStrip?.remove();
+  if (searchQuery) {
+    renderSearchResults();
+    return;
   }
+
+  document.querySelector('.search-results-info')?.remove();
+
+  // Trending tab has its own render path with two sections
+  if (activeTab === 'top') {
+    renderTrending();
+    return;
+  }
+
+  // Leaving 'top' tab — tear down its sections
+  cleanupTrendingSections();
+
+  const allPosts = getPostsForTab(activeTab);
+  const posts = allPosts.slice(0, renderedCount);
 
   const isGallery = activeTab === 'drawings';
   feed.classList.toggle('feed-gallery', isGallery);
+  feed.classList.toggle('feed-list', !isGallery);
 
   if (allPosts.length === 0) {
     feed.querySelectorAll('[data-id]').forEach(el => {
       seenObserver.unobserve(el);
       replySubObserver.unobserve(el);
+      visibilityObserver.unobserve(el);
       const id = el.dataset.id;
+      visibleCards.delete(id);
       if (replySubs.has(id)) { replySubs.get(id)(); replySubs.delete(id); }
       cardElements.delete(id);
       el.remove();
@@ -1338,15 +1830,10 @@ function renderFeed() {
     renderInto(feed, posts);
   }
 
-  // Rank badges
-  feed.querySelectorAll('.post[data-id]').forEach((el, i) => {
-    if (activeTab === 'top') {
-      el.classList.add('post-rank');
-      el.dataset.rank = '#' + (i + 1);
-    } else {
-      el.classList.remove('post-rank');
-      el.removeAttribute('data-rank');
-    }
+  // Rank badges (non-top tabs: remove any leftover badges)
+  feed.querySelectorAll('.post[data-id]').forEach(el => {
+    el.classList.remove('post-rank');
+    el.removeAttribute('data-rank');
   });
 
   // Sentinel: show when there are more posts to reveal or fetch
@@ -1364,6 +1851,8 @@ function renderGallery(container, list) {
     if (!desiredIds.has(id) || !child.classList.contains('drawing-tile')) {
       seenObserver.unobserve(child);
       replySubObserver.unobserve(child);
+      visibilityObserver.unobserve(child);
+      visibleCards.delete(id);
       if (replySubs.has(id)) { replySubs.get(id)(); replySubs.delete(id); }
       child.remove();
       cardElements.delete(id);
@@ -1374,8 +1863,6 @@ function renderGallery(container, list) {
     if (!existing) {
       existing = buildDrawingTile(id, data);
       cardElements.set(id, existing);
-    } else {
-      updateDrawingTile(existing, data);
     }
     const postsInContainer = Array.from(container.querySelectorAll('[data-id]'));
     const current = postsInContainer[idx];
@@ -1390,7 +1877,9 @@ function renderInto(container, list) {
     if (!desiredIds.includes(child.dataset.id) || child.classList.contains('drawing-tile')) {
       seenObserver.unobserve(child);
       replySubObserver.unobserve(child);
+      visibilityObserver.unobserve(child);
       const id = child.dataset.id;
+      visibleCards.delete(id);
       if (replySubs.has(id)) { replySubs.get(id)(); replySubs.delete(id); }
       child.remove();
       cardElements.delete(id);
@@ -1463,18 +1952,19 @@ const sentinelObserver = new IntersectionObserver((entries) => {
 }, { rootMargin: '400px' });
 sentinelObserver.observe(loadSentinel);
 
-// Refresh relative timestamps — only for cards visible in the viewport
 setInterval(() => {
   if (document.visibilityState === 'hidden') return;
-  const vh = window.innerHeight;
-  cardElements.forEach((el, id) => {
-    if (!el.isConnected) return;
-    const { top, bottom } = el.getBoundingClientRect();
-    if (bottom < 0 || top > vh) return;
+  visibleCards.forEach(id => {
+    const el = cardElements.get(id);
+    if (!el || !el.isConnected) {
+      visibleCards.delete(id);
+      cardElements.delete(id);
+      return;
+    }
     const data = postsMap.get(id);
     if (data) updatePostCard(el, data, me);
   });
-}, 30000);
+}, 60000);
 
 // ═══════════════════════════════════════════
 // NOTIFICATIONS
@@ -1509,9 +1999,10 @@ function updateNotifications() {
     const maintainCount = data.maintainedCount || 0;
     if (likes > (base.likes || 0)) unread++;
     if (replies > (base.replies || 0)) unread++;
-    if (reportCount >= 3 && reportCount > maintainCount && reportCount > (base.reportNotified || 0)) unread++;
-    if (maintainCount > 0 && data.maintainNote && maintainCount >= reportCount && reportCount >= 3 && maintainCount > (base.maintainNotified || 0)) unread++;
+    if (reportCount >= 7 && reportCount > maintainCount && reportCount > (base.reportNotified || 0)) unread++;
+    if (maintainCount > 0 && data.maintainNote && maintainCount >= reportCount && reportCount >= 7 && maintainCount > (base.maintainNotified || 0)) unread++;
   });
+  mentionsData.forEach(m => { if (!mentionsSeen.has(m.id)) unread++; });
   if (unread > 0) {
     notifBadge.textContent = unread;
     notifBadge.classList.remove('hidden');
@@ -1538,11 +2029,13 @@ function closeNotifDrawer() {
     };
   });
   saveBaseline(notifBaseline);
+  mentionsData.forEach(m => mentionsSeen.add(m.id));
+  saveMentionsSeen(mentionsSeen);
   updateNotifications();
 }
 
 function nameGradient(name) {
-  const palette = ['#ff2d78','#9b59ff','#00d4ff','#ff6ba6','#ffb800','#34e89e','#fc466b','#3f5efb','#d926a9'];
+  const palette = ['#ff2d78', '#9b59ff', '#00d4ff', '#ff6ba6', '#ffb800', '#34e89e', '#fc466b', '#3f5efb', '#d926a9'];
   let h = 0;
   for (const c of (name || '?')) h = (h * 31 + c.charCodeAt(0)) & 0xffff;
   const i = h % palette.length;
@@ -1555,26 +2048,28 @@ function renderNotifList() {
   const own = ownPosts();
   const items = [];
 
-  const heartSVG  = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
-  const chatSVG   = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`;
-  const alertSVG  = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`;
-  const checkSVG  = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
-  const drawSVG   = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z"/><path d="M9 8c-2 3-4 3.5-7 4l8 10c2-1 6-5 6-7"/></svg>`;
+  const heartSVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+  const chatSVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`;
+  const alertSVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`;
+  const checkSVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
+  const mentionSVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/></svg>`;
+  const drawSVG = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z"/><path d="M9 8c-2 3-4 3.5-7 4l8 10c2-1 6-5 6-7"/></svg>`;
 
   own.forEach(([id, data]) => {
     const base = notifBaseline[id] || { likes: 0, replies: 0, reportNotified: 0, maintainNotified: 0 };
-    const likes         = othersLikes(data);
-    const replies       = data.replyCount || 0;
-    const reportCount   = data.reportedBy?.length || 0;
+    const likes = othersLikes(data);
+    const replies = data.replyCount || 0;
+    const reportCount = data.reportedBy?.length || 0;
     const maintainCount = data.maintainedCount || 0;
-    const postDate      = data.createdAt?.seconds || 0;
-    const isDrawing     = data.type === 'drawing';
+    const postDate = data.createdAt?.seconds || 0;
+    const isDrawing = data.type === 'drawing';
+    const drawingSrc = isDrawing && typeof data.message === 'string' && /^data:image\/(png|jpeg|gif|webp);base64,/.test(data.message) ? data.message : '';
     const postPreviewText = isDrawing ? '' : (data.message || '').slice(0, 100);
 
     if (likes > 0) {
-      const hasNew  = likes > (base.likes || 0);
-      const liker   = data.lastLikerName || 'alguém';
-      const extra   = likes - 1;
+      const hasNew = likes > (base.likes || 0);
+      const liker = data.lastLikerName || 'alguém';
+      const extra = likes - 1;
       const textHTML = extra > 0
         ? `<strong>${escapeHTML(liker)}</strong> +${extra} curtiram seu post.`
         : `<strong>${escapeHTML(liker)}</strong> curtiu seu post.`;
@@ -1582,46 +2077,68 @@ function renderNotifList() {
       const otherLikerIds = (data.likedBy || [])
         .filter(uid => uid !== me?.id && uid !== data.lastLikerId)
         .slice(-3);
-      items.push({ id, postDate, hasNew, icon: heartSVG, type: 'like', avatarName: liker, extra, textHTML, isDrawing, preview: postPreviewText, likerGradient, otherLikerIds });
+      const actionDate = data.lastLikedAt?.seconds || postDate;
+      items.push({ id, postDate: actionDate, hasNew, icon: heartSVG, type: 'like', avatarName: liker, extra, textHTML, isDrawing, drawingSrc, preview: postPreviewText, likerGradient, otherLikerIds });
     }
 
     if (replies > 0) {
-      const hasNew  = replies > (base.replies || 0);
-      const author  = data.lastReplyAuthor || 'alguém';
-      const extra   = replies - 1;
+      const hasNew = replies > (base.replies || 0);
+      const author = data.lastReplyAuthor || 'alguém';
+      const uniqueCount = data.replyUniqueAuthors?.length || 1;
+      const extra = uniqueCount - 1;
       const textHTML = extra > 0
-        ? `<strong>${escapeHTML(author)}</strong> e mais ${extra} comentaram no seu post.`
+        ? `<strong>${escapeHTML(author)}</strong> e mais ${extra} ${extra === 1 ? 'pessoa comentaram' : 'pessoas comentaram'} no seu post.`
         : `<strong>${escapeHTML(author)}</strong> comentou no seu post.`;
       const preview = data.lastReplyText
         ? data.lastReplyText.slice(0, 100)
         : postPreviewText;
-      items.push({ id, postDate, hasNew, icon: chatSVG, type: 'comment', avatarName: author, extra, textHTML, isDrawing, preview });
+      const replyGradient = data.lastReplyGradient || null;
+      const actionDate = data.lastRepliedAt?.seconds || postDate;
+      items.push({ id, postDate: actionDate, hasNew, icon: chatSVG, type: 'comment', avatarName: author, extra, textHTML, isDrawing, drawingSrc, preview, likerGradient: replyGradient });
     }
 
-    const isRemoved = reportCount >= 3 && reportCount > maintainCount;
+    const isRemoved = reportCount >= 7 && reportCount > maintainCount;
     if (isRemoved) {
       const hasNew = reportCount > (base.reportNotified || 0);
-      items.push({ id, postDate, hasNew, icon: alertSVG, type: 'report', avatarName: null, extra: 0, textHTML: 'Seu post recebeu três denúncias e foi retirado para avaliação dos hosts.', isDrawing, preview: postPreviewText });
+      items.push({ id, postDate, hasNew, icon: alertSVG, type: 'report', avatarName: null, extra: 0, textHTML: 'Seu post recebeu sete denúncias e foi retirado para avaliação dos hosts.', isDrawing, drawingSrc, preview: postPreviewText });
     }
 
-    const isRestored = reportCount >= 3 && maintainCount >= reportCount && data.maintainNote;
+    const isRestored = reportCount >= 7 && maintainCount >= reportCount && data.maintainNote;
     if (isRestored) {
       const hasNew = maintainCount > (base.maintainNotified || 0);
-      items.push({ id, postDate, hasNew, icon: checkSVG, type: 'restore', avatarName: null, extra: 0, textHTML: 'Após análise dos moderadores, seu post voltou ao ar.', isDrawing, preview: (data.maintainNote || '').slice(0, 100) });
+      items.push({ id, postDate, hasNew, icon: checkSVG, type: 'restore', avatarName: null, extra: 0, textHTML: 'Após análise dos moderadores, seu post voltou ao ar.', isDrawing, drawingSrc, preview: (data.maintainNote || '').slice(0, 100) });
     }
   });
 
-  items.sort((a, b) => {
-    if (a.hasNew !== b.hasNew) return a.hasNew ? -1 : 1;
-    return b.postDate - a.postDate;
+  mentionsData.forEach(m => {
+    const hasNew = !mentionsSeen.has(m.id);
+    const textHTML = m.context === 'post'
+      ? `<strong>${escapeHTML(m.fromName)}</strong> te mencionou em um post.`
+      : `<strong>${escapeHTML(m.fromName)}</strong> te mencionou em uma resposta.`;
+    items.push({
+      id: m.postId,
+      postDate: m.createdAt?.seconds || 0,
+      hasNew,
+      icon: mentionSVG,
+      type: 'mention',
+      avatarName: m.fromName,
+      extra: 0,
+      textHTML,
+      isDrawing: false,
+      preview: m.replyText || '',
+      likerGradient: m.fromGradient || null,
+      otherLikerIds: [],
+    });
   });
+
+  items.sort((a, b) => b.postDate - a.postDate);
 
   if (items.length === 0) {
     notifList.innerHTML = '<div class="notif-empty">meio vazio aqui...<br></div>';
     return;
   }
 
-  items.forEach(({ id, hasNew, icon, type, avatarName, extra, textHTML, isDrawing, preview, likerGradient, otherLikerIds }) => {
+  items.forEach(({ id, hasNew, icon, type, avatarName, extra, textHTML, isDrawing, drawingSrc, preview, likerGradient, otherLikerIds }) => {
     const wrap = document.createElement('div');
     wrap.className = `notif-item notif-type-${type}${hasNew ? ' unread' : ''}`;
 
@@ -1634,12 +2151,14 @@ function renderNotifList() {
         }
       }
       const grad = likerGradient ? gradientCSS(likerGradient) : nameGradient(avatarName);
-      avatarsHTML += `<div class="notif-avatar" style="background-image:${grad}">${escapeHTML(avatarName.charAt(0).toUpperCase())}</div>`;
+      avatarsHTML += `<div class="notif-avatar" style="background-image:${grad}"></div>`;
       if (type !== 'like' && extra > 0) avatarsHTML += `<div class="notif-avatar notif-avatar-more">+${extra}</div>`;
     }
 
     let previewHTML = '';
-    if (isDrawing) {
+    if (isDrawing && drawingSrc) {
+      previewHTML = `<img class="notif-drawing-thumb" src="${drawingSrc}" alt="desenho" />`;
+    } else if (isDrawing) {
       previewHTML = `<div class="notif-post-preview is-drawing">${drawSVG} desenho</div>`;
     } else if (preview) {
       previewHTML = `<div class="notif-post-preview">${escapeHTML(preview)}${preview.length >= 100 ? '…' : ''}</div>`;
@@ -1706,6 +2225,163 @@ function showConfirmToast(text, onYes, onNo) {
 }
 
 // ═══════════════════════════════════════════
+// DRAWING LIGHTBOX
+// ═══════════════════════════════════════════
+
+function renderLightboxActions(actionsEl, postId, data) {
+  if (!actionsEl || !data) return;
+  const liked = (data.likedBy || []).includes(me?.id);
+  const likeCount = (data.likedBy || []).length;
+  const replyCount = data.replyCount || 0;
+  actionsEl.innerHTML = `
+    <button class="action-btn like-btn ${liked ? 'liked' : ''}" type="button">
+      <svg width="17" height="17" viewBox="0 0 24 24"
+        fill="${liked ? 'currentColor' : 'none'}"
+        stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+      </svg>
+      <span class="count">${likeCount}</span>
+    </button>
+    <button class="action-btn reply-btn" type="button" disabled style="pointer-events:none">
+      <svg width="17" height="17" viewBox="0 0 24 24"
+        fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+      </svg>
+      <span class="count">${replyCount}</span>
+    </button>
+  `;
+  actionsEl.querySelector('.like-btn').addEventListener('click', () => {
+    toggleLike(postId, postsMap.get(postId) || data);
+  });
+}
+
+document.addEventListener('click', e => {
+  const img = e.target.closest('.post-drawing');
+  if (!img || !img.src) return;
+  const postEl = img.closest('[data-id]');
+  const postId = postEl?.dataset.id;
+  const postData = postId ? (postsMap.get(postId) ?? null) : null;
+  let _lbUnsub = null;
+  _lightboxPostId = postId || null;
+  openLightbox(img.src, {
+    caption: postData?.caption || null,
+    author: postData?.author || null,
+    gradient: postData?.gradient || null,
+    avatarPhoto: postData?.avatarPhoto || null,
+    onOpen: (threadEl, composerEl, actionsEl) => {
+      if (postId && actionsEl) renderLightboxActions(actionsEl, postId, postsMap.get(postId) || postData);
+      if (!postId) return;
+      const q = query(collection(db, POSTS, postId, 'replies'), orderBy('createdAt', 'asc'), limit(50));
+      _lbUnsub = onSnapshot(q, snap => renderLightboxThread(threadEl, snap));
+      wireLightboxComposer(composerEl, postId);
+    },
+    onClose: () => { _lbUnsub?.(); _lbUnsub = null; _lightboxPostId = null; },
+  });
+});
+
+function renderLightboxThread(threadEl, snap) {
+  threadEl.innerHTML = '';
+  if (snap.empty) {
+    threadEl.innerHTML = '<div class="lightbox-empty">nenhum comentário ainda.</div>';
+    return;
+  }
+  const postId = _lightboxPostId;
+  snap.forEach(d => {
+    const r = { replyId: d.id, ...d.data() };
+    const grad = r.gradient?.length === 2 ? gradientCSS(r.gradient) : gradientCSS(['#ff2d78', '#9b59ff']);
+    const liked = (r.likedBy || []).includes(me?.id);
+    const likeCount = (r.likedBy || []).length;
+    const item = document.createElement('div');
+    item.className = 'thread-item';
+    item.innerHTML = `
+      <div class="avatar avatar-sm" style="background-image:${grad};background-size:130% 130%;background-position:center center"></div>
+      <div class="reply-body">
+        <div class="reply-header">
+          <span class="reply-author">${escapeHTML(r.author || 'anônimo')}</span>
+          ${MOD_NAMES.has(r.author) ? '<span class="mod-star mod-star-sm">★</span>' : ''}
+          <span class="reply-time">${formatTime(r.createdAt)}</span>
+        </div>
+        <div class="reply-content">${highlightMentions(escapeHTML(r.message))}</div>
+        <div class="reply-actions">
+          <button class="reply-like-btn ${liked ? 'liked' : ''}" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24"
+              fill="${liked ? 'currentColor' : 'none'}"
+              stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+            ${likeCount > 0 ? `<span>${likeCount}</span>` : ''}
+          </button>
+          <button class="reply-reply-btn" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    `;
+
+    if (postId) {
+      item.querySelector('.reply-like-btn').addEventListener('click', () => toggleReplyLike(postId, r.replyId, r));
+      item.querySelector('.reply-reply-btn').addEventListener('click', () => {
+        const mention = `@${r.author} `;
+        const input = document.querySelector('.lightbox-reply-input');
+        if (!input) return;
+        input.value = mention;
+        input.dispatchEvent(new Event('input'));
+        input.focus();
+        input.setSelectionRange(mention.length, mention.length);
+      });
+    }
+
+    threadEl.appendChild(item);
+  });
+}
+
+function wireLightboxComposer(composerEl, postId) {
+  if (!me) return;
+  composerEl.classList.remove('hidden');
+  const input = composerEl.querySelector('.lightbox-reply-input');
+  const sendBtn = composerEl.querySelector('.lightbox-reply-send');
+  input.addEventListener('input', () => {
+    sendBtn.disabled = input.value.trim().length === 0;
+  });
+  const submit = async () => {
+    const txt = input.value.trim();
+    if (!txt) return;
+    sendBtn.disabled = true;
+    try {
+      await addDoc(collection(db, POSTS, postId, 'replies'), {
+        message: txt, author: me.name, authorId: me.id,
+        gradient: me.gradient, createdAt: serverTimestamp(),
+      });
+      await updateDoc(doc(db, POSTS, postId), {
+        replyCount: increment(1),
+        lastReplyAuthor: me.name,
+        lastReplyText: txt.slice(0, 100),
+        lastReplyGradient: me.gradient,
+        lastRepliedAt: serverTimestamp(),
+        replyUniqueAuthors: arrayUnion(me.id),
+      });
+      writeMentions(txt, postId, 'reply');
+      input.value = '';
+    } catch (err) {
+      console.error('lightbox reply error', err);
+    } finally {
+      sendBtn.disabled = true;
+    }
+  };
+  sendBtn.addEventListener('click', submit);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
+  });
+}
+
+// ═══════════════════════════════════════════
 // BACKGROUND PARTICLES
 // ═══════════════════════════════════════════
 (function particles() {
@@ -1720,3 +2396,95 @@ function showConfirmToast(text, onYes, onNo) {
     container.appendChild(p);
   }
 })();
+
+// ═══════════════════════════════════════════
+// OFFLINE MODE
+// ═══════════════════════════════════════════
+const offlineScreen = document.getElementById('offlineScreen');
+const offlineDownloadPdfBtn = document.getElementById('offlineDownloadPdfBtn');
+
+if (offlineDownloadPdfBtn) {
+  offlineDownloadPdfBtn.addEventListener('click', async () => {
+    if (!me) {
+      showToast('crie um perfil para ter posts');
+      return;
+    }
+    await downloadMyPostsAsPDF();
+  });
+}
+
+let wasOffline = false;
+onSnapshot(doc(db, 'hangul_bans', 'SYSTEM_OFFLINE'), (snap) => {
+  if (snap.exists() && snap.data().isOffline) {
+    document.querySelector('.app-shell')?.classList.add('hidden');
+    document.querySelector('.topbar')?.classList.add('hidden');
+    document.getElementById('onboardingOverlay')?.classList.add('hidden');
+    document.getElementById('feedSearchBar')?.classList.add('hidden');
+    offlineScreen?.classList.remove('hidden');
+    wasOffline = true;
+  } else if (wasOffline) {
+    location.reload();
+  }
+});
+
+// ── COUNTDOWN LOGIC ──
+const countdownScreen = document.getElementById('countdownScreen');
+const countdownTimerText = document.getElementById('countdownTimerText');
+let countdownInterval = null;
+let countdownActive = false;
+let countdownTarget = null;
+let wasCountdownActive = false;
+
+function updateCountdownDisplay() {
+  if (!countdownActive || !countdownTarget) return;
+  const now = new Date().getTime();
+  const target = countdownTarget.getTime();
+  const diff = target - now;
+  
+  if (diff <= 0) {
+    // Countdown finished
+    countdownTimerText.textContent = "00:00:00";
+    if (countdownInterval) clearInterval(countdownInterval);
+    // Refresh to clear the block
+    location.reload();
+    return;
+  }
+  
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const secs = Math.floor((diff % (1000 * 60)) / 1000);
+  
+  const pad = n => String(n).padStart(2, '0');
+  countdownTimerText.textContent = `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
+}
+
+onSnapshot(doc(db, 'hangul_bans', 'SYSTEM_COUNTDOWN'), (snap) => {
+  if (snap.exists()) {
+    const data = snap.data();
+    countdownActive = data.active === true;
+    countdownTarget = data.targetTime ? new Date(data.targetTime) : null;
+    
+    if (countdownActive && countdownTarget) {
+      const now = new Date().getTime();
+      if (countdownTarget.getTime() > now) {
+        wasCountdownActive = true;
+        countdownScreen?.classList.remove('hidden');
+        if (countdownInterval) clearInterval(countdownInterval);
+        updateCountdownDisplay();
+        countdownInterval = setInterval(updateCountdownDisplay, 1000);
+      } else {
+        // Already expired. Just hide the overlay, no reload needed.
+        countdownScreen?.classList.add('hidden');
+        if (countdownInterval) clearInterval(countdownInterval);
+      }
+    } else {
+      if (wasCountdownActive) {
+        // If it was active and now is stopped by admin, refresh
+        location.reload();
+      } else {
+        countdownScreen?.classList.add('hidden');
+        if (countdownInterval) clearInterval(countdownInterval);
+      }
+    }
+  }
+});

@@ -1,4 +1,4 @@
-# Weverse Hangover — CLAUDE.md
+# Weverse Hangover — Gemini.md
 
 ## O que é este projeto
 

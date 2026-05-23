@@ -1,53 +1,56 @@
-importScripts('https://www.gstatic.com/firebasejs/11.8.1/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/11.8.1/firebase-messaging-compat.js');
+// Service Worker de push para o painel admin do Weverse Hangover.
+// Não usa Firebase no SW — lê o payload diretamente da Web Push API,
+// que é o formato entregue pelo FCM HTTP v1. Isso elimina a race condition
+// onde firebase.messaging() era registrado tarde demais para interceptar
+// o evento push já em execução.
 
-// To receive push notifications, the service worker needs the Firebase config.
-// Since we don't have modules here easily, we will expect the frontend to register
-// the service worker and pass the config, or we fetch it from the same API endpoint.
-self.addEventListener('install', (event) => {
-  event.waitUntil(self.skipWaiting());
-});
+self.addEventListener('install', () => self.skipWaiting());
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
-});
+self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
 
-// We need to fetch the config to initialize Firebase in the background
-let messaging = null;
+self.addEventListener('push', event => {
+  let title = 'Weverse Hangover';
+  let body  = 'Nova atividade no painel.';
+  let link  = '/adm/';
 
-async function initFirebase() {
-  if (messaging) return messaging;
-  try {
-    const res = await fetch('/api/config');
-    const config = await res.json();
-    
-    firebase.initializeApp({
-      apiKey: config.apiKey,
-      authDomain: config.authDomain,
-      projectId: config.projectId,
-      storageBucket: config.storageBucket,
-      messagingSenderId: config.messagingSenderId,
-      appId: config.appId
-    });
-    
-    messaging = firebase.messaging();
-    
-    messaging.onBackgroundMessage((payload) => {
-      const notificationTitle = payload.notification.title;
-      const notificationOptions = {
-        body: payload.notification.body,
-        icon: '/favicon.ico' // Ensure you have an icon, or fallback to default
-      };
-
-      self.registration.showNotification(notificationTitle, notificationOptions);
-    });
-    return messaging;
-  } catch (err) {
-    console.error('Failed to init Firebase in SW:', err);
+  if (event.data) {
+    try {
+      const payload = event.data.json();
+      title = payload.notification?.title || title;
+      body  = payload.notification?.body  || body;
+      link  = payload.webpush?.fcm_options?.link || link;
+    } catch {}
   }
-}
 
-// Intercept push to ensure firebase is initialized
-self.addEventListener('push', (event) => {
-  event.waitUntil(initFirebase());
+  event.waitUntil((async () => {
+    // Avisa abas abertas do /adm/ via BroadcastChannel (notificação em foreground)
+    const bc = new BroadcastChannel('hangul-push');
+    bc.postMessage({ title, body });
+    bc.close();
+
+    // Exibe notificação push somente se nenhuma aba do /adm/ estiver visível
+    const windowClients = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const hasVisibleAdm = windowClients.some(
+      c => c.url.includes('/adm/') && c.visibilityState === 'visible'
+    );
+    if (!hasVisibleAdm) {
+      await self.registration.showNotification(title, {
+        body,
+        icon:  '/icon.png',
+        badge: '/icon.png',
+        data:  { link },
+      });
+    }
+  })());
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const link = event.notification.data?.link || '/adm/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(all => {
+      const adm = all.find(c => c.url.includes('/adm/'));
+      return adm ? adm.focus() : clients.openWindow(link);
+    })
+  );
 });

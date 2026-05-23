@@ -87,7 +87,7 @@ input, textarea { font-family: var(--font-main); }
   flex-wrap: wrap;
 }
 
-.post-author  { font-weight: 700; color: var(--text-primary); font-size: 0.9rem; }
+.post-author  { font-weight: 700; color: var(--text-primary); font-size: 0.9rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .post-time    { font-size: 0.72rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
 .post-mine-tag {
@@ -117,15 +117,18 @@ input, textarea { font-family: var(--font-main); }
   color: var(--text-primary);
 }
 
+.mention-tag {
+  color: var(--blue-electric);
+  font-weight: 600;
+}
+
 .post-drawing {
   max-width: 250px; width: 100%; aspect-ratio: 3 / 4;
-  border-radius: var(--radius-md); background: #fff;
-  margin: 4px auto 0; border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  margin: 10px auto; border: 1px solid var(--border-subtle);
   object-fit: cover; display: block;
   cursor: pointer;
   touch-action: manipulation;
-  position: relative;
-  left: -26px;
 }
 
 /* ════════════ LIGHTBOX ════════════ */
@@ -133,18 +136,16 @@ input, textarea { font-family: var(--font-main); }
   position: fixed;
   inset: 0;
   z-index: 9000;
-  background: rgba(0, 0, 0, 0.93);
+  background: rgba(10, 0, 20, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 24px;
-  padding: 24px 20px;
+  padding: 16px;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  transition: opacity 0.25s;
 }
 
 .lightbox-overlay.open {
@@ -152,32 +153,163 @@ input, textarea { font-family: var(--font-main); }
   pointer-events: all;
 }
 
-.lightbox-img {
-  max-width: min(400px, 100%);
-  max-height: 72dvh;
-  border-radius: var(--radius-md);
-  object-fit: contain;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
-  display: block;
-  flex-shrink: 0;
+.lightbox-panel {
+  position: relative;
+  width: 100%;
+  max-width: 540px;
+  max-height: 92dvh;
+  background: rgba(20, 8, 40, 0.99);
+  border-radius: 20px;
+  border: 1px solid var(--border-strong);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: lbFadeScale 0.24s cubic-bezier(0.34, 1.2, 0.64, 1);
+}
+
+@keyframes lbFadeScale {
+  from { transform: scale(0.94); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
 }
 
 .lightbox-close {
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: #fff;
-  padding: 14px 52px;
-  border-radius: 999px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--red);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: background 0.15s;
-  min-height: 50px;
   touch-action: manipulation;
-  flex-shrink: 0;
 }
 
 .lightbox-close:active { background: rgba(255, 255, 255, 0.22); }
+
+.lightbox-img-wrap {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #07000f;
+}
+
+.lightbox-img {
+  display: block;
+  max-width: 100%;
+  max-height: 55dvh;
+  width: auto;
+  height: auto;
+}
+
+.lightbox-author {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 14px;
+  padding-right: 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.lightbox-author-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lightbox-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.lightbox-actions:empty {
+  display: none;
+}
+
+.lightbox-caption {
+  flex-shrink: 0;
+  padding: 10px 16px 10px;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: center;
+}
+
+.post-drawing-caption {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+  padding: 5px 0 2px;
+  text-align: center;
+}
+
+.lightbox-replies-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.lightbox-thread {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 16px 4px;
+}
+
+.lightbox-empty {
+  text-align: center;
+  padding: 20px 16px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.lightbox-composer {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 14px;
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border-subtle);
+}
+
+.lightbox-reply-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 8px 14px;
+  color: var(--text-primary);
+  font-family: var(--font-main);
+  font-size: 0.85rem;
+  outline: none;
+  min-height: 36px;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.lightbox-reply-input:focus {
+  border-color: var(--pink-neon);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.lightbox-reply-input::placeholder { color: var(--text-muted); }
 
 .post-actions {
   display: flex;
@@ -295,7 +427,7 @@ input, textarea { font-family: var(--font-main); }
   margin-bottom: 2px; flex-wrap: wrap;
 }
 
-.reply-author  { font-weight: 700; font-size: 0.82rem; color: var(--text-primary); }
+.reply-author  { font-weight: 700; font-size: 0.82rem; color: var(--text-primary); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .reply-time    { font-size: 0.68rem; color: var(--text-muted); }
 
 .reply-content {
@@ -324,6 +456,23 @@ input, textarea { font-family: var(--font-main); }
 .reply-like-btn.liked     { color: var(--pink-neon); }
 .reply-like-btn.liked svg { fill: var(--pink-neon); }
 
+.reply-reply-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 6px 3px 2px; border-radius: 999px; border: none;
+  background: transparent; color: var(--text-muted);
+  font-size: 0.75rem; font-weight: 600;
+  cursor: pointer; transition: color 0.2s;
+}
+.reply-reply-btn:hover { color: var(--purple-accent); }
+
+.replies-toggle-btn {
+  display: block; width: 100%; text-align: left;
+  padding: 5px 0 5px 32px; background: transparent; border: none;
+  color: var(--purple-accent); font-size: 0.78rem; font-weight: 600;
+  cursor: pointer; transition: color 0.2s; margin-top: 2px;
+}
+.replies-toggle-btn:hover { color: var(--text-primary); }
+
 .reply-delete {
   background: rgba(255, 59, 59, 0.08); border: 1px solid rgba(255, 59, 59, 0.18);
   color: var(--red); padding: 3px 9px; border-radius: 6px; font-size: 0.7rem;
@@ -351,6 +500,7 @@ input, textarea { font-family: var(--font-main); }
   max-height: 56px;
   opacity: 1;
   padding-top: 8px;
+  padding-bottom: 16px;
   margin-top: 2px;
   pointer-events: auto;
 }
@@ -410,3 +560,41 @@ input, textarea { font-family: var(--font-main); }
 .toast.show    { opacity: 1; transform: translateX(-50%) translateY(0); }
 .toast.success { border-color: rgba(52, 232, 158, 0.4); color: var(--green); }
 .toast.error   { border-color: rgba(255, 59, 59, 0.4); color: var(--red); }
+
+/* ════════════ COUNTDOWN OVERLAY ════════════ */
+.countdown-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  text-align: center;
+  padding: 20px;
+}
+.countdown-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--pink-neon);
+  margin-bottom: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.countdown-timer {
+  font-size: 4rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  background: linear-gradient(135deg, var(--pink-neon) 0%, var(--blue-electric) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.countdown-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-top: 20px;
+}
+

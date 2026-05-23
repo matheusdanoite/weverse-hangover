@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cartazes - Weverse Hangover</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #2a2a2a;
+            /* Fundo escuro para destacar as folhas na tela */
+            font-family: 'Outfit', sans-serif;
+            color: #000;
+        }
+
+        .page {
+            background-color: #fff;
+            /* Fundo branco para a impressora não usar tinta, a folha em si será rosa */
+            width: 210mm;
+            height: 297mm;
+            margin: 20mm auto;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            page-break-after: always;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .inner {
+            padding: 20mm;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 0;
+        }
+
+        @media print {
+            body {
+                background-color: transparent;
+            }
+
+            .page {
+                margin: 0;
+                box-shadow: none;
+                page-break-after: always;
+            }
+
+            /* Garantir que margens de impressão não interfiram no layout */
+            html,
+            body {
+                width: 210mm;
+                height: 297mm;
+            }
+        }
+
+        /* Tipografia */
+        h1 {
+            font-size: 85px;
+            font-weight: 900;
+            line-height: 1.2;
+            margin: 0;
+            letter-spacing: -2px;
+            text-transform: uppercase;
+        }
+
+        h1.massive {
+            font-size: 105px;
+            line-height: 0.85;
+            letter-spacing: -3px;
+        }
+
+        p.desc {
+            font-size: 32px;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-top: 40px;
+        }
+
+        p.sub {
+            font-size: 24px;
+            font-weight: 400;
+            margin-top: 20px;
+        }
+
+        /* Rodapé com URL e QR Code */
+        .footer {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            border-top: 6px solid #000;
+            padding-top: 15mm;
+            margin-top: auto;
+        }
+
+        .footer-text {
+            flex: 1;
+        }
+
+        .footer-text h2 {
+            font-size: 30px;
+            font-weight: 900;
+            margin: 0;
+            text-transform: uppercase;
+        }
+
+        .footer-text p {
+            font-size: 22px;
+            font-weight: 700;
+            margin: 8px 0 0 0;
+            letter-spacing: -1px;
+        }
+
+        .qr-container {
+            width: 140px;
+            height: 140px;
+            flex-shrink: 0;
+            margin-left: 20px;
+            border: 4px solid #000;
+            padding: 5px;
+        }
+
+        .qr-container img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            image-rendering: pixelated;
+            /* Mantém a nitidez do QR Code */
+        }
+
+        /* Estilos específicos para o cartaz duplo */
+        .double-left {
+            border-right: 35px solid #000;
+        }
+
+        .double-right {
+            border-left: 35px solid #000;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- CARTAZ 1: Destaque de Funcionalidade / Convite Geral -->
+    <div class="page">
+        <div class="inner">
+            <div>
+                <h1>A FESTA É<br>AQUI E LÁ</h1>
+                <p class="desc">Entre no Weverse Hangover</p>
+                <p class="sub">Sem aplicativo <br> Sem login <br> Sem complicação
+            </div>
+            <div class="footer">
+                <div class="footer-text">
+                    <h2>K-POP <br>É TOP</h2>
+                    <p>weverse-hangover.pages.dev</p>
+                </div>
+                <div class="qr-container">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=https://weverse-hangover.pages.dev"
+                        alt="QR Code Weverse Hangover">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CARTAZ 2: Incentivo a usar as funções (Desenho e Texto) -->
+    <div class="page">
+        <div class="inner">
+            <div>
+                <h1>RABISCAR<br>POSTAR<br>APARECER</h1>
+                <p class="desc">Ao vivo no telão</p>
+                <p class="sub"><br>Desenhe seu bias<br>Escreva seu verso favorito<br>Dê like só para dar dislike<br></p>
+            </div>
+            <div class="footer">
+                <div class="footer-text">
+                    <h2>TODO MUNDO<br> OUVE K-POP</h2>
+                    <p>weverse-hangover.pages.dev</p>
+                </div>
+                <div class="qr-container">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=https://weverse-hangover.pages.dev"
+                        alt="QR Code Weverse Hangover">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CARTAZ 3: Moderação e Regras -->
+    <div class="page">
+        <div class="inner">
+            <div>
+                <h1>RESPEITE<br>O BIAS</h1>
+                <p class="desc">Atenção com o que você posta</p>
+                <p class="sub">Nossa equipe de moderação está de olho em tudo<br> Mantenha o respeito para não levar
+                    ban</p>
+            </div>
+            <div class="footer">
+                <div class="footer-text">
+                    <h2>SEMEAR O CAOS<br>RESPEITOSAMENTE</h2>
+                    <p>weverse-hangover.pages.dev</p>
+                </div>
+                <div class="qr-container">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=https://weverse-hangover.pages.dev"
+                        alt="QR Code Weverse Hangover">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CARTAZ 4: Centralizado e minimalista -->
+    <div class="page">
+        <div class="inner" style="justify-content: center; text-align: center;">
+            <p style="font-size: 30px; font-weight: 700; margin-bottom: 20px;">VOCÊ ESTÁ NA</p>
+            <h1 style="font-size: 90px; line-height: 0.9; margin-bottom: 50px;">HANGUL<br>HANGOVER</h1>
+            <div style="width: 250px; height: 250px; margin: 0 auto 40px auto; border: 8px solid #000; padding: 10px;">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=https://weverse-hangover.pages.dev"
+                    alt="QR Code Weverse Hangover"
+                    style="width: 100%; height: 100%; display: block; image-rendering: pixelated;">
+            </div>
+            <p
+                style="font-size: 28px; font-family: monospace; font-weight: 700; letter-spacing: -1px; margin-bottom: 15px;">
+                weverse-hangover.pages.dev</p>
+            <p class="sub" style="margin-top: 0; font-weight: 700;">Acesse a rede social oficial da festa.</p>
+        </div>
+    </div>
+
+</body>
+
+</html>

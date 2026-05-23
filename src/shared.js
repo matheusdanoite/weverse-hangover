@@ -4,39 +4,99 @@
 
 // ── Lightbox singleton ──
 let _lightbox = null;
+let _lightboxOnClose = null;
+
+const _SEND_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`;
 
 function getLightbox() {
   if (_lightbox) return _lightbox;
   const ov = document.createElement('div');
   ov.className = 'lightbox-overlay';
   ov.innerHTML = `
-    <img class="lightbox-img" src="" alt="desenho" />
-    <button class="lightbox-close" type="button">Fechar</button>
+    <div class="lightbox-panel">
+      <button class="lightbox-close" type="button" aria-label="Fechar">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+      <div class="lightbox-img-wrap">
+        <img class="lightbox-img" src="" alt="desenho" />
+      </div>
+      <div class="lightbox-author hidden">
+        <div class="lightbox-author-avatar avatar avatar-sm"></div>
+        <span class="lightbox-author-name"></span>
+        <div class="lightbox-actions"></div>
+      </div>
+      <div class="lightbox-caption hidden"></div>
+      <div class="lightbox-replies-area"></div>
+    </div>
   `;
-  const close = () => ov.classList.remove('open');
-  ov.querySelector('.lightbox-close').addEventListener('click', close);
-  ov.addEventListener('click', e => { if (e.target === ov) close(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  const closeLb = () => {
+    ov.classList.remove('open');
+    if (_lightboxOnClose) { _lightboxOnClose(); _lightboxOnClose = null; }
+  };
+  ov.querySelector('.lightbox-close').addEventListener('click', closeLb);
+  ov.addEventListener('click', e => { if (e.target === ov) closeLb(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && ov.classList.contains('open')) closeLb(); });
   document.body.appendChild(ov);
   _lightbox = ov;
   return ov;
 }
 
+export function openLightbox(src, { onOpen, onClose, caption, author, gradient, avatarPhoto } = {}) {
+  const lb = getLightbox();
+  lb.querySelector('.lightbox-img').src = src;
+  const captionEl = lb.querySelector('.lightbox-caption');
+  if (caption) {
+    captionEl.textContent = caption;
+    captionEl.classList.remove('hidden');
+  } else {
+    captionEl.textContent = '';
+    captionEl.classList.add('hidden');
+  }
+  const authorEl = lb.querySelector('.lightbox-author');
+  if (author) {
+    const avatarEl = authorEl.querySelector('.lightbox-author-avatar');
+    if (avatarPhoto) {
+      avatarEl.style.backgroundImage = `url(${avatarPhoto})`;
+      avatarEl.style.backgroundSize = 'cover';
+      avatarEl.style.backgroundPosition = 'center center';
+    } else {
+      avatarEl.style.backgroundImage = gradientCSS(gradient?.length === 2 ? gradient : null);
+      avatarEl.style.backgroundSize = '130% 130%';
+      avatarEl.style.backgroundPosition = 'center center';
+    }
+    authorEl.querySelector('.lightbox-author-name').textContent = author;
+    authorEl.classList.remove('hidden');
+  } else {
+    authorEl.classList.add('hidden');
+  }
+  const actionsEl = lb.querySelector('.lightbox-actions');
+  actionsEl.innerHTML = '';
+  const repliesArea = lb.querySelector('.lightbox-replies-area');
+  repliesArea.innerHTML = `
+    <div class="lightbox-thread"></div>
+    <div class="lightbox-composer hidden">
+      <input class="lightbox-reply-input" type="text" placeholder="responder..." maxlength="200" autocomplete="off" autocorrect="on" autocapitalize="sentences" />
+      <button class="lightbox-reply-send reply-send" type="button" disabled>${_SEND_SVG}</button>
+    </div>
+  `;
+  if (_lightboxOnClose) { _lightboxOnClose(); _lightboxOnClose = null; }
+  _lightboxOnClose = onClose || null;
+  lb.classList.add('open');
+  if (onOpen) onOpen(repliesArea.querySelector('.lightbox-thread'), repliesArea.querySelector('.lightbox-composer'), actionsEl);
+}
+
 // Global delegated listeners
 document.addEventListener('click', e => {
-  // Open lightbox on drawing click
-  if (e.target.matches('.post-drawing')) {
-    const lb = getLightbox();
-    lb.querySelector('.lightbox-img').src = e.target.src;
-    lb.classList.add('open');
-    return;
-  }
   // Close any open post menu
   document.querySelectorAll('.post-menu.open').forEach(m => m.classList.remove('open'));
 });
 
 export function gradientCSS(g) {
-  if (!g || g.length !== 2) return 'linear-gradient(to bottom right, #ff2d78 0%, #9b59ff 100%)';
+  const isHex = c => typeof c === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(c);
+  if (!g || g.length !== 2 || !isHex(g[0]) || !isHex(g[1]))
+    return 'linear-gradient(to bottom right, #ff2d78 0%, #9b59ff 100%)';
   return `linear-gradient(to bottom right, ${g[0]} 0%, ${g[1]} 100%)`;
 }
 
@@ -50,6 +110,10 @@ export function escapeHTML(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+export function highlightMentions(escapedText) {
+  return escapedText.replace(/@([a-zA-Z0-9._]{1,40})/g, '<span class="mention-tag">@$1</span>');
 }
 
 /** Relative time (e.g. "3m", "2h") — used by main feed */
@@ -107,15 +171,20 @@ export function buildPostCard(id, data, opts = {}) {
   const isMod  = modNames.has(data.author);
   const isMine = data.authorId === me?.id;
   const reported = (data.reportedBy || []).includes(me?.id);
-  const grad   = gradientCSS(data.gradient?.length === 2 ? data.gradient : null);
+  const grad   = data.avatarPhoto
+    ? `url(${data.avatarPhoto})`
+    : gradientCSS(data.gradient?.length === 2 ? data.gradient : null);
+  const avatarBgExtra = data.avatarPhoto
+    ? 'background-size:cover;background-position:center center'
+    : 'background-size:130% 130%;background-position:center center';
 
   const drawingSrc = isDrawing && typeof data.message === 'string' &&
     /^data:image\/(png|jpeg|gif|webp);base64,/.test(data.message)
     ? data.message
     : '';
   const contentHTML = isDrawing
-    ? (drawingSrc ? `<img class="post-drawing" src="${drawingSrc}" alt="desenho" loading="lazy" />` : '')
-    : `<div class="post-content">${escapeHTML(data.message || '')}</div>`;
+    ? (drawingSrc ? `<img class="post-drawing" src="${drawingSrc}" alt="desenho" loading="lazy" />${data.caption ? `<div class="post-drawing-caption">${highlightMentions(escapeHTML(data.caption))}</div>` : ''}` : '')
+    : `<div class="post-content">${highlightMentions(escapeHTML(data.message || ''))}</div>`;
 
   const el = document.createElement('article');
   el.className = 'post';
@@ -123,7 +192,7 @@ export function buildPostCard(id, data, opts = {}) {
   el.dataset.id = id;
 
   el.innerHTML = `
-    <div class="avatar avatar-md" style="background-image:${grad};background-size:130% 130%;background-position:center center"></div>
+    <div class="avatar avatar-md" style="background-image:${grad};${avatarBgExtra}"></div>
     <div class="post-body">
       <div class="post-header">
         <span class="post-author">${escapeHTML(data.author || 'anônimo')}</span>
