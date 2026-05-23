@@ -361,10 +361,25 @@ deleteDataBtn.addEventListener('click', async () => {
 });
 
 async function downloadMyPostsAsPDF() {
+  if (!me) {
+    showToast('crie um perfil para baixar posts');
+    return;
+  }
+  
+  showToast('buscando seus posts…');
+  
   const myPosts = [];
-  postsMap.forEach((data, id) => {
-    if (data.authorId === me?.id) myPosts.push({ id, ...data });
-  });
+  try {
+    const q = query(collection(db, POSTS), where('authorId', '==', me.id));
+    const snap = await getDocs(q);
+    snap.forEach(d => {
+      myPosts.push({ id: d.id, ...d.data() });
+    });
+  } catch (err) {
+    console.error('erro ao buscar posts para pdf:', err);
+    showToast('erro ao buscar seus posts');
+    return;
+  }
 
   if (myPosts.length === 0) {
     showToast('você ainda não tem posts');
