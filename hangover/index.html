@@ -1,61 +1,70 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport"
-    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="theme-color" content="#0a0010" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#0d0015" />
   <link rel="icon" type="image/png" href="/icon.png" />
-  <link rel="apple-touch-icon" href="/icon.png" />
   <title>Weverse Hangover — Live Board</title>
-  <meta name="description" content="Mural ao vivo da Hangul Hangover" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;600;700;800&family=Outfit:wght@300;400;600;700;800;900&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=Noto+Sans+KR:wght@400;700&display=swap"
+    rel="stylesheet" />
   <link rel="stylesheet" href="./board.css" />
 </head>
+
 <body>
-  <div class="kinetic-bg tint-default" id="kineticBg"></div>
+  <div class="display-frame">
+    <div class="display-viewport">
 
-  <header class="board-header" id="boardHeader">
-    <div class="header-left">
-      <span class="live-dot"></span>
-      <div class="wordmark">
-        <span class="wm-weverse">WEVERSE</span>
-        <span class="wm-hangover">HANGOVER</span>
-      </div>
-    </div>
-    <div class="header-right">
-      <div class="stats-bar" id="statsBar">
-        <span class="stat-chip" id="statPosts">
-          <span class="stat-val">0</span>
-          <span class="stat-label">posts</span>
-        </span>
-        <span class="stat-chip" id="statLikes">
-          <span class="stat-val">0</span>
-          <span class="stat-label">curtidas</span>
-        </span>
-      </div>
-    </div>
-  </header>
+      <div class="bg-particles" id="bgParticles"></div>
 
-  <div class="view-label-wrap" id="viewLabelWrap">
-    <div class="view-label-text" id="viewLabelText"></div>
+      <header class="topbar">
+        <div class="topbar-inner">
+          <div class="brand">
+            <span class="brand-hangul">WEVERSE</span>
+            <span class="brand-hangover">HANGOVER</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="grid-area">
+
+        <div class="board-loading" id="boardLoading">
+          <svg class="spinner" width="36" height="36" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" stroke="rgba(255,45,120,0.25)" stroke-width="2.5" fill="none"/>
+            <path d="M12 2a10 10 0 0 1 10 10" stroke="#ff2d78" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          </svg>
+          <div class="board-loading-text">carregando posts…</div>
+        </div>
+
+        <div class="board-empty hidden" id="boardEmpty">
+          <span class="empty-icon">✦</span>
+          <p>nenhum post ainda</p>
+        </div>
+
+        <div class="grid-scroll" id="gridScroll">
+          <div class="grid-inner" id="gridInner"></div>
+        </div>
+
+        <div class="new-post-overlay" id="newPostOverlay">
+          <div class="new-post-card-container" id="newPostContainer"></div>
+        </div>
+
+      </div>
+
+    </div>
   </div>
 
-  <main class="board-scene" id="boardScene"></main>
-
-  <div class="empty-state hidden" id="emptyState">
-    <div class="empty-glyph">✦</div>
-    <p class="empty-title">aguardando o primeiro post...</p>
-    <p class="empty-sub">acesse e poste algo</p>
+  <div class="pause-indicator" id="pauseIndicator">
+    <span class="pause-icon"><span></span><span></span></span>
+    pausado
   </div>
-
-  <div class="pause-indicator" id="pauseIndicator">⏸ PAUSADO</div>
 
   <script type="module" src="./board.js"></script>
 </body>
+
 </html>
