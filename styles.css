@@ -757,6 +757,7 @@ html, body {
   border-radius: 0;
   background: var(--bg);
   cursor: pointer;
+  animation: postFadeIn 0.4s ease-out;
 }
 
 .drawing-tile .tile-img {
