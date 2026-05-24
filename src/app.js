@@ -7,7 +7,7 @@ import {
   getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
 } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js';
 import {
-  initializeFirestore, collection, collectionGroup, addDoc, doc, updateDoc, serverTimestamp,
+  getFirestore, collection, collectionGroup, addDoc, doc, updateDoc, serverTimestamp,
   query, orderBy, limit, startAfter, onSnapshot, arrayUnion, arrayRemove, increment,
   where, getDocs, deleteDoc, getDoc, setDoc
 } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js';
@@ -19,9 +19,7 @@ import {
 // ── Firebase + moderator profiles (fetched from server — emails never in client JS) ──
 const firebaseConfig = await fetch('/api/config').then(r => r.json());
 const app = initializeApp(firebaseConfig);
-const db = initializeFirestore(app, {
-  experimentalAutoDetectLongPolling: true,
-});
+const db = getFirestore(app);
 const auth = getAuth(app);
 const POSTS = 'hangul_messages';
 const USERS = 'hangul_usernames';

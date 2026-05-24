@@ -3,7 +3,7 @@ import {
   getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
 } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js';
 import {
-  initializeFirestore, collection, addDoc, doc, updateDoc, deleteDoc, setDoc,
+  getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, setDoc,
   serverTimestamp, Timestamp, query, orderBy, onSnapshot, limit, increment,
   getDoc, getDocs, where, arrayUnion, arrayRemove,
 } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js';
@@ -22,9 +22,7 @@ const BANS  = 'hangul_bans';
 
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db   = initializeFirestore(app, {
-  experimentalAutoDetectLongPolling: true,
-});
+const db   = getFirestore(app);
 
 // ── DOM ──
 const loginScreen        = document.getElementById('loginScreen');
