@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js';
 import {
-  getFirestore, collection, onSnapshot, query, orderBy, limit, doc
+  initializeFirestore, collection, onSnapshot, query, orderBy, limit, doc
 } from 'https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js';
 import {
   gradientCSS, escapeHTML, highlightMentions, formatTime
@@ -10,7 +10,9 @@ const POSTS = 'hangul_messages';
 
 const firebaseConfig = await fetch('/api/config').then(r => r.json());
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true,
+});
 
 const MOD_NAMES = new Set((firebaseConfig.moderatorProfiles || []).map(p => p.name));
 
