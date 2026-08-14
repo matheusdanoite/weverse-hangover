@@ -33,3 +33,5 @@ GEMINI.md
 
 # Deployment & Firebase
 .firebaserc
+node_modules/
+
